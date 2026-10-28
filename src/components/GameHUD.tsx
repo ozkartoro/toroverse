@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingBag,
   User,
@@ -36,6 +36,8 @@ import {
   Award,
   CheckCircle2,
   Package,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { BlockId, MaterialId, MaterialInventory, VoxelWorldData, WeaponId } from '../types/game';
 import { BLOCK_DEFINITIONS } from '../game/blockDefinitions';
@@ -166,7 +168,12 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   materialInventory,
   onOpenCrafting,
 }) => {
-  const [dockCollapsed, setDockCollapsed] = useState(false);
+  const [dockCollapsed, setDockCollapsed] = useState<boolean>(() => {
+    return (
+      isMobileTouch ||
+      (typeof window !== 'undefined' && (window.innerWidth < 1024 || window.innerHeight < 600))
+    );
+  });
   const totalStoredMaterials = materialInventory
     ? (Object.values(materialInventory) as Array<number | undefined>).reduce<number>(
         (acc, v) => acc + (v ?? 0),
@@ -174,10 +181,63 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       )
     : 0;
   const [forceTouchControls, setForceTouchControls] = useState<boolean>(() => {
-    return isMobileTouch || window.innerWidth < 1024;
+    return (
+      isMobileTouch ||
+      (typeof window !== 'undefined' && (window.innerWidth < 1024 || window.innerHeight < 600))
+    );
   });
   const [stickActive, setStickActive] = useState(false);
   const [stickPos, setStickPos] = useState({ x: 0, y: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Sync fullscreen state when user presses ESC or browser exits fullscreen
+  useEffect(() => {
+    const handleFsChange = () => {
+      const doc = document as any;
+      const fsElement = doc.fullscreenElement || doc.webkitFullscreenElement;
+      if (!fsElement && isFullscreen) {
+        setIsFullscreen(false);
+      } else if (fsElement && !isFullscreen) {
+        setIsFullscreen(true);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, [isFullscreen]);
+
+  const handleToggleFullscreen = async () => {
+    sound.playClick();
+    const doc = document as any;
+    const elem = document.documentElement as any;
+    const isCurrentlyNativeFs = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+
+    if (!isFullscreen && !isCurrentlyNativeFs) {
+      setIsFullscreen(true);
+      setDockCollapsed(true);
+      try {
+        if (elem.requestFullscreen) {
+          await elem.requestFullscreen();
+        } else if (elem.webkitRequestFullscreen) {
+          await elem.webkitRequestFullscreen();
+        }
+      } catch (_) {
+        // Fallback immersive mode on iOS Safari where native Fullscreen API is restricted
+      }
+    } else {
+      setIsFullscreen(false);
+      try {
+        if (doc.exitFullscreen && doc.fullscreenElement) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen && doc.webkitFullscreenElement) {
+          await doc.webkitExitFullscreen();
+        }
+      } catch (_) {}
+    }
+  };
 
   const showTouchControls = forceTouchControls || isMobileTouch;
   const healthPercent = Math.max(0, Math.min(100, (health / maxHealth) * 100));
@@ -219,7 +279,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   };
 
   return (
-    <div className="absolute inset-0 pointer-events-none select-none z-30 flex flex-col justify-between p-2.5 sm:p-4 md:p-5">
+    <div className="absolute inset-0 pointer-events-none select-none z-30 flex flex-col justify-between p-1.5 sm:p-3.5 md:p-5 overflow-hidden">
       {/* Reticle / Crosshair in Center */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none flex items-center justify-center">
         <div className="relative w-6 h-6 flex items-center justify-center">
@@ -233,63 +293,63 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
       </div>
 
-      {/* Top Bar Perimeter Cluster (Responsive wrap) */}
-      <div className="flex flex-wrap items-start justify-between gap-2 w-full">
+      {/* Top Bar Perimeter Cluster (Compact on mobile to maximize 3D viewport) */}
+      <div className="flex flex-wrap items-start justify-between gap-1.5 sm:gap-2 w-full z-20">
         {/* Top-Left: Player, Health Bar & Island Cluster */}
-        <div className="pointer-events-auto flex flex-col gap-1.5 max-w-[340px] sm:max-w-md">
-          <div className="flex flex-col gap-2 rounded-2xl bg-slate-950/85 border border-cyan-500/30 p-2.5 sm:p-3 shadow-xl backdrop-blur-sm">
-            <div className="flex items-center justify-between gap-2">
+        <div className="pointer-events-auto flex flex-col gap-1 max-w-[235px] sm:max-w-md">
+          <div className="flex flex-col gap-1 sm:gap-2 rounded-xl sm:rounded-2xl bg-slate-950/80 border border-cyan-500/30 p-1.5 sm:p-3 shadow-lg backdrop-blur-sm">
+            <div className="flex items-center justify-between gap-1.5 sm:gap-2">
               <button
                 onClick={() => {
                   sound.playClick();
                   onOpenStory();
                 }}
-                className="flex items-center gap-2 hover:opacity-80 transition text-left"
+                className="flex items-center gap-1.5 sm:gap-2 hover:opacity-80 transition text-left min-w-0"
               >
-                <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-slate-950 text-xs sm:text-sm shadow-md shadow-cyan-500/30 flex-shrink-0">
+                <div className="h-6 w-6 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-slate-950 text-[10px] sm:text-sm shadow-md shadow-cyan-500/30 flex-shrink-0">
                   VT
                 </div>
-                <div className="overflow-hidden">
-                  <div className="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
-                    Victoria Toro{' '}
-                    <span className="text-[9px] font-mono text-cyan-300 font-normal bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                <div className="overflow-hidden min-w-0">
+                  <div className="text-[11px] sm:text-sm font-bold text-white flex items-center gap-1 truncate">
+                    <span className="truncate">Victoria Toro</span>
+                    <span className="hidden sm:inline-block text-[9px] font-mono text-cyan-300 font-normal bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30">
                       Nivel 5
                     </span>
                   </div>
-                  <div className="text-[10px] sm:text-[11px] text-slate-400 font-medium truncate">
+                  <div className="hidden sm:block text-[11px] text-slate-400 font-medium truncate">
                     {activeWorld.name.split(':')[0]}
                   </div>
                 </div>
               </button>
 
-              <div className="h-6 w-px bg-slate-800 mx-0.5 flex-shrink-0" />
+              <div className="h-4 sm:h-6 w-px bg-slate-800 mx-0.5 flex-shrink-0" />
 
               {/* In-game Points readout */}
               <div className="text-right flex-shrink-0">
-                <div className="text-[9px] uppercase font-mono text-amber-400/80">Puntos Toro</div>
-                <div className="text-xs sm:text-sm font-extrabold text-amber-300 font-mono tabular-nums">
+                <div className="hidden sm:block text-[9px] uppercase font-mono text-amber-400/80">Puntos Toro</div>
+                <div className="text-[10px] sm:text-sm font-extrabold text-amber-300 font-mono tabular-nums">
                   {points.toLocaleString()} PTS
                 </div>
               </div>
             </div>
 
             {/* Health Bar (Barra de Salud de Victoria) */}
-            <div className="flex items-center gap-2 pt-1 border-t border-slate-800/80">
+            <div className="flex items-center gap-1.5 sm:gap-2 pt-0.5 sm:pt-1 border-t border-slate-800/80">
               <div
-                className={`flex items-center justify-center rounded-lg p-1 ${
+                className={`flex items-center justify-center rounded-md p-0.5 sm:p-1 ${
                   isLowHealth ? 'bg-rose-500/30 text-rose-400 animate-pulse' : 'bg-emerald-500/20 text-emerald-400'
                 }`}
               >
-                <Heart className="h-3.5 w-3.5 fill-current" />
+                <Heart className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 fill-current" />
               </div>
               <div className="flex-1 flex flex-col gap-0.5">
-                <div className="flex items-center justify-between text-[10px] font-mono">
+                <div className="flex items-center justify-between text-[8px] sm:text-[10px] font-mono leading-none">
                   <span className="font-bold text-slate-300">SALUD</span>
                   <span className={`font-bold ${isLowHealth ? 'text-rose-400 animate-bounce' : 'text-emerald-400'}`}>
-                    {health} / {maxHealth} HP
+                    {health}/{maxHealth} HP
                   </span>
                 </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden relative shadow-inner">
+                <div className="w-full h-1.5 sm:h-2 rounded-full bg-slate-800 overflow-hidden relative shadow-inner">
                   <div
                     className={`h-full transition-all duration-300 rounded-full ${
                       healthPercent > 50
@@ -307,9 +367,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
           {/* Toast Notification message */}
           {notificationMessage && (
-            <div className="rounded-xl bg-cyan-950/90 border border-cyan-400/50 px-3 py-1.5 text-xs text-cyan-200 font-semibold shadow-lg backdrop-blur-sm animate-bounce flex items-center gap-2">
-              <Shield className="h-3.5 w-3.5 text-cyan-400 flex-shrink-0" />
-              <span>{notificationMessage}</span>
+            <div className="rounded-lg sm:rounded-xl bg-cyan-950/90 border border-cyan-400/50 px-2 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs text-cyan-200 font-semibold shadow-lg backdrop-blur-sm flex items-center gap-1.5 max-w-[230px] sm:max-w-sm truncate">
+              <Shield className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-cyan-400 flex-shrink-0" />
+              <span className="truncate">{notificationMessage}</span>
             </div>
           )}
 
@@ -376,17 +436,17 @@ export const GameHUD: React.FC<GameHUDProps> = ({
 
         {/* Dynamic Day/Night Celestial Clock Bar */}
         {dayNightState && (
-          <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl bg-slate-950/85 border border-slate-800/80 p-1.5 sm:px-3 sm:py-2 shadow-xl backdrop-blur-sm">
+          <div className="pointer-events-auto flex items-center gap-1 rounded-xl sm:rounded-2xl bg-slate-950/80 border border-slate-800/80 p-1 sm:px-3 sm:py-2 shadow-lg backdrop-blur-sm">
             <button
               onClick={() => {
                 sound.playClick();
                 onAdvanceDayNightTime?.(3);
               }}
               title="Avanzar 3 horas en el ciclo celestre"
-              className="flex items-center gap-2 hover:opacity-90 transition group"
+              className="flex items-center gap-1.5 sm:gap-2 hover:opacity-90 transition group"
             >
               <div
-                className={`p-1.5 rounded-xl border flex items-center justify-center transition-all ${
+                className={`p-1 sm:p-1.5 rounded-lg sm:rounded-xl border flex items-center justify-center transition-all ${
                   dayNightState.phase === 'dawn'
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-[0_0_10px_#f59e0b]'
                     : dayNightState.phase === 'day'
@@ -396,18 +456,18 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                     : 'bg-indigo-950 text-cyan-300 border-indigo-500/40 shadow-[0_0_12px_#6366f1]'
                 }`}
               >
-                {dayNightState.phase === 'dawn' && <Sunrise className="h-4 w-4 animate-pulse" />}
-                {dayNightState.phase === 'day' && <Sun className="h-4 w-4 animate-spin-slow" />}
-                {dayNightState.phase === 'dusk' && <Sunset className="h-4 w-4 animate-pulse" />}
-                {dayNightState.phase === 'night' && <Moon className="h-4 w-4 animate-pulse" />}
+                {dayNightState.phase === 'dawn' && <Sunrise className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />}
+                {dayNightState.phase === 'day' && <Sun className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin-slow" />}
+                {dayNightState.phase === 'dusk' && <Sunset className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />}
+                {dayNightState.phase === 'night' && <Moon className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-pulse" />}
               </div>
               <div className="flex flex-col text-left">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-mono font-extrabold text-white text-xs sm:text-sm tracking-wide">
+                <div className="flex items-center gap-1">
+                  <span className="font-mono font-extrabold text-white text-[11px] sm:text-sm tracking-wide">
                     {dayNightState.formattedTime}
                   </span>
                   <span
-                    className={`text-[9px] uppercase font-bold px-1.5 py-0.2 rounded border font-mono hidden xs:inline-block ${
+                    className={`text-[9px] uppercase font-bold px-1.5 py-0.2 rounded border font-mono hidden md:inline-block ${
                       dayNightState.phase === 'dawn'
                         ? 'bg-amber-950/70 text-amber-300 border-amber-500/30'
                         : dayNightState.phase === 'day'
@@ -420,14 +480,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                     {dayNightState.phaseLabel}
                   </span>
                 </div>
-                <div className="text-[9px] text-slate-400 font-medium hidden sm:block">
+                <div className="text-[9px] text-slate-400 font-medium hidden lg:block">
                   {dayNightState.isAutoAdvancing ? 'Ciclo continuo (24h)' : 'Tiempo fijado'}
                 </div>
               </div>
             </button>
 
-            {/* Quick celestial presets & Auto toggle */}
-            <div className="flex items-center gap-1 border-l border-slate-800/90 pl-1.5 sm:pl-2 ml-1">
+            {/* Quick celestial presets & Auto toggle (Hidden on small mobile screens to save space) */}
+            <div className="hidden lg:flex items-center gap-1 border-l border-slate-800/90 pl-2 ml-1">
               <button
                 onClick={() => {
                   sound.playClick();
@@ -449,7 +509,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   onSetDayNightHour?.(6.25);
                 }}
                 title="Amanecer (06:15)"
-                className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-900 text-amber-400/80 hover:text-amber-300 transition"
+                className="p-1.5 rounded-lg hover:bg-slate-900 text-amber-400/80 hover:text-amber-300 transition"
               >
                 <Sunrise className="h-3.5 w-3.5" />
               </button>
@@ -460,7 +520,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   onSetDayNightHour?.(12.0);
                 }}
                 title="Mediodía Solar (12:00)"
-                className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-900 text-yellow-400/80 hover:text-yellow-300 transition"
+                className="p-1.5 rounded-lg hover:bg-slate-900 text-yellow-400/80 hover:text-yellow-300 transition"
               >
                 <Sun className="h-3.5 w-3.5" />
               </button>
@@ -471,7 +531,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   onSetDayNightHour?.(18.75);
                 }}
                 title="Atardecer Carmesí (18:45)"
-                className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-900 text-rose-400/80 hover:text-rose-300 transition"
+                className="p-1.5 rounded-lg hover:bg-slate-900 text-rose-400/80 hover:text-rose-300 transition"
               >
                 <Sunset className="h-3.5 w-3.5" />
               </button>
@@ -482,7 +542,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   onSetDayNightHour?.(0.0);
                 }}
                 title="Noche Cuántica (00:00)"
-                className="p-1 sm:p-1.5 rounded-lg hover:bg-slate-900 text-indigo-400/80 hover:text-indigo-300 transition"
+                className="p-1.5 rounded-lg hover:bg-slate-900 text-indigo-400/80 hover:text-indigo-300 transition"
               >
                 <Moon className="h-3.5 w-3.5" />
               </button>
@@ -555,162 +615,188 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           </div>
         )}
 
-        {/* Top-Right: Action Icons & Cross-play Cluster */}
-        <div className="pointer-events-auto flex items-center gap-1.5 sm:gap-2 flex-wrap justify-end">
-          {/* Storage & Crafting Button */}
-          {onOpenCrafting && (
+        {/* Top-Right: Action Icons & Mini-Map Column */}
+        <div className="pointer-events-auto flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-end">
+            {/* Storage & Crafting Button */}
+            {onOpenCrafting && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onOpenCrafting();
+                }}
+                className="relative flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-gradient-to-r from-emerald-950/90 to-cyan-950/90 border border-emerald-400/60 text-emerald-300 hover:bg-emerald-900/60 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm cursor-pointer"
+              >
+                <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400" />
+                <span className="hidden sm:inline">Almacén /</span>
+                <span>Unir</span>
+                <span className="rounded-md bg-emerald-500/25 border border-emerald-400/40 px-1 py-0.2 text-[9px] sm:text-[10px] font-mono font-black text-emerald-200">
+                  {totalStoredMaterials}
+                </span>
+              </button>
+            )}
+
+            {/* Story Quest Log Button */}
+            {onOpenQuestLog && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onOpenQuestLog();
+                }}
+                className="relative flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+              >
+                <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
+                <span className="hidden md:inline">Diario [J]</span>
+                {(unclaimedQuestsCount ?? 0) > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white animate-bounce shadow-[0_0_8px_#ef4444]">
+                    {unclaimedQuestsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* Weekly Event Pill Button */}
             <button
               onClick={() => {
                 sound.playClick();
-                onOpenCrafting();
+                onOpenWeeklyEvent();
               }}
-              className="relative flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-emerald-950/90 to-cyan-950/90 border border-emerald-400/60 text-emerald-300 hover:bg-emerald-900/60 text-xs font-bold transition shadow-lg backdrop-blur-sm cursor-pointer"
+              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-pink-500/40 text-pink-300 hover:bg-pink-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm`}
             >
-              <Package className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-400" />
-              <span>Almacén / Unir [E]</span>
-              <span className="ml-0.5 rounded-md bg-emerald-500/25 border border-emerald-400/40 px-1.5 py-0.2 text-[10px] font-mono font-black text-emerald-200">
-                {totalStoredMaterials}
-              </span>
+              <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-pink-400 animate-pulse" />
+              <span className="hidden md:inline">Evento Neón</span>
             </button>
-          )}
 
-          {/* Story Quest Log Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onOpenQuestLog?.();
-            }}
-            className="relative flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-xs font-bold transition shadow-lg backdrop-blur-sm"
-          >
-            <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
-            <span className="hidden md:inline">Diario [J]</span>
-            {(unclaimedQuestsCount ?? 0) > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-black text-white animate-bounce shadow-[0_0_8px_#ef4444]">
-                {unclaimedQuestsCount}
-              </span>
-            )}
-          </button>
+            {/* Marketplace Button */}
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenMarketplace();
+              }}
+              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm`}
+            >
+              <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
+              <span className="hidden md:inline">Mercado</span>
+            </button>
 
-          {/* Weekly Event Pill Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onOpenWeeklyEvent();
-            }}
-            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-950/85 border border-pink-500/40 text-pink-300 hover:bg-pink-950/40 text-xs font-bold transition shadow-lg backdrop-blur-sm"
-          >
-            <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-pink-400 animate-pulse" />
-            <span className="hidden md:inline">Evento Neón</span>
-          </button>
+            {/* Avatar Customizer Button */}
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenAvatar();
+              }}
+              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm`}
+            >
+              <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden md:inline">Avatar</span>
+            </button>
 
-          {/* Marketplace Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onOpenMarketplace();
-            }}
-            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-xs font-bold transition shadow-lg backdrop-blur-sm"
-          >
-            <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
-            <span className="hidden md:inline">Mercado</span>
-          </button>
+            {/* World Editor Button */}
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenWorldEditor();
+              }}
+              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm`}
+            >
+              <Globe className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="hidden md:inline">Islas</span>
+            </button>
 
-          {/* Avatar Customizer Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onOpenAvatar();
-            }}
-            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-950/85 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-xs font-bold transition shadow-lg backdrop-blur-sm"
-          >
-            <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden md:inline">Avatar</span>
-          </button>
+            {/* Emotes Button */}
+            <button
+              onClick={() => {
+                sound.playClick();
+                onOpenEmotes();
+              }}
+              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm ${
+                activeEmote
+                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border border-pink-300 shadow-pink-500/40 animate-pulse'
+                  : 'bg-slate-950/85 border border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
+              }`}
+            >
+              <span className="text-xs sm:text-sm">💃</span>
+              <span className="hidden md:inline">Emotes [B]</span>
+            </button>
 
-          {/* World Editor Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onOpenWorldEditor();
-            }}
-            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-950/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/40 text-xs font-bold transition shadow-lg backdrop-blur-sm"
-          >
-            <Globe className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            <span className="hidden md:inline">Islas</span>
-          </button>
+            {/* Fullscreen / Normal Mode Toggle Button */}
+            <button
+              onClick={handleToggleFullscreen}
+              title={isFullscreen ? 'Volver al Modo Normal' : 'Activar Pantalla Completa'}
+              className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl border text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm cursor-pointer ${
+                isFullscreen
+                  ? 'bg-amber-500/25 border-amber-400 text-amber-200 hover:bg-amber-500/35 shadow-amber-500/20'
+                  : 'bg-cyan-500/20 border-cyan-400/60 text-cyan-200 hover:bg-cyan-500/30 shadow-cyan-500/15'
+              }`}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-300" />
+                  <span>Modo Normal</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-300" />
+                  <span>Pantalla Completa</span>
+                </>
+              )}
+            </button>
 
-          {/* Emotes Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onOpenEmotes();
-            }}
-            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition shadow-lg backdrop-blur-sm ${
-              activeEmote
-                ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border border-pink-300 shadow-pink-500/40 animate-pulse'
-                : 'bg-slate-950/85 border border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
-            }`}
-          >
-            <span className="text-sm">💃</span>
-            <span className="hidden md:inline">Emotes [B]</span>
-          </button>
+            {/* Toggle Touch Controls Button */}
+            <button
+              onClick={() => {
+                sound.playClick();
+                setForceTouchControls(!forceTouchControls);
+              }}
+              title="Activar/Desactivar Controles Táctiles en Pantalla"
+              className={`p-1.5 sm:p-2 rounded-xl border transition shadow-lg backdrop-blur-sm ${
+                showTouchControls
+                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
+                  : 'bg-slate-950/85 border-slate-800 text-slate-400 hover:text-white'
+              }`}
+            >
+              <Smartphone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </button>
 
-          {/* Toggle Touch Controls Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              setForceTouchControls(!forceTouchControls);
-            }}
-            title="Activar/Desactivar Controles Táctiles en Pantalla"
-            className={`p-1.5 sm:p-2 rounded-xl border transition shadow-lg backdrop-blur-sm ${
-              showTouchControls
-                ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
-                : 'bg-slate-950/85 border-slate-800 text-slate-400 hover:text-white'
-            }`}
-          >
-            <Smartphone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </button>
+            {/* Audio toggle */}
+            <button
+              onClick={() => {
+                onToggleMute();
+                sound.playClick();
+              }}
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-950/85 border border-slate-800 text-slate-300 hover:text-white transition shadow-lg backdrop-blur-sm"
+            >
+              {isMuted ? <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-400" />}
+            </button>
 
-          {/* Audio toggle */}
-          <button
-            onClick={() => {
-              onToggleMute();
-              sound.playClick();
-            }}
-            className="p-1.5 sm:p-2 rounded-xl bg-slate-950/85 border border-slate-800 text-slate-300 hover:text-white transition shadow-lg backdrop-blur-sm"
-          >
-            {isMuted ? <VolumeX className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-400" /> : <Volume2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-400" />}
-          </button>
+            {/* Pause Button */}
+            <button
+              onClick={() => {
+                sound.playClick();
+                onPause();
+              }}
+              className="p-1.5 sm:p-2 rounded-xl bg-slate-950/85 border border-slate-800 text-slate-300 hover:text-white transition shadow-lg backdrop-blur-sm"
+            >
+              <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </button>
+          </div>
 
-          {/* Pause Button */}
-          <button
-            onClick={() => {
-              sound.playClick();
-              onPause();
-            }}
-            className="p-1.5 sm:p-2 rounded-xl bg-slate-950/85 border border-slate-800 text-slate-300 hover:text-white transition shadow-lg backdrop-blur-sm"
-          >
-            <Pause className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </button>
+          {/* Dynamic Radar Mini-Map (Starts collapsed as a sleek pill on mobile so it never blocks the view) */}
+          <MiniMap
+            playerX={playerX ?? 0}
+            playerY={playerY ?? 0}
+            playerZ={playerZ ?? 0}
+            playerYaw={playerYaw ?? 0}
+            enemies={minimapEnemies ?? []}
+            pois={minimapPois ?? []}
+            islandName={activeWorld.name}
+          />
         </div>
       </div>
 
-      {/* Upper-Right Corner: Dynamic Radar Mini-Map */}
-      <div className="absolute top-18 sm:top-20 right-2.5 sm:right-4 md:right-5 z-20 pointer-events-auto">
-        <MiniMap
-          playerX={playerX ?? 0}
-          playerY={playerY ?? 0}
-          playerZ={playerZ ?? 0}
-          playerYaw={playerYaw ?? 0}
-          enemies={minimapEnemies ?? []}
-          pois={minimapPois ?? []}
-          islandName={activeWorld.name}
-        />
-      </div>
-
-      {/* Middle-Left: Unobtrusive Chat Ticker */}
+      {/* Middle-Left: Unobtrusive Chat Ticker (Hidden on compact mobile screens to keep 3D view clear) */}
       {recentChat && (
-        <div className="pointer-events-none my-auto max-w-xs sm:max-w-sm rounded-xl bg-slate-950/75 border border-slate-800 p-2 sm:p-2.5 text-xs text-slate-200 shadow-md backdrop-blur-sm">
+        <div className="hidden md:block pointer-events-none my-auto max-w-xs sm:max-w-sm rounded-xl bg-slate-950/75 border border-slate-800 p-2 sm:p-2.5 text-xs text-slate-200 shadow-md backdrop-blur-sm">
           <div className="flex items-center gap-1.5 font-bold text-cyan-400 text-[10px] sm:text-[11px] mb-0.5">
             <MessageSquare className="h-3 w-3" />
             <span>{recentChat.sender}</span>
@@ -722,51 +808,83 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
       )}
 
-      {/* Touch Controls Layer (Available on Mobile, Tablets, and when toggled) */}
+      {/* Touch Controls Layer (Anchored safely inside the viewport so buttons are never cut off) */}
       {showTouchControls && (
-        <div className="flex justify-between items-end pointer-events-none mb-3 sm:mb-6 w-full px-2">
-          {/* Virtual Joystick */}
+        <div
+          className={`absolute left-2.5 right-2.5 sm:left-4 sm:right-4 pointer-events-none z-30 flex justify-between items-end transition-all ${
+            dockCollapsed ? 'bottom-9 sm:bottom-11' : 'bottom-32 sm:bottom-36'
+          }`}
+        >
+          {/* Left: Virtual Joystick */}
           <div
             onTouchStart={handleTouchStartStick}
             onTouchMove={handleTouchMoveStick}
             onTouchEnd={handleTouchEndStick}
-            className="pointer-events-auto h-24 w-24 sm:h-28 sm:w-28 rounded-full bg-slate-900/70 border-2 border-cyan-500/40 relative flex items-center justify-center touch-none shadow-2xl backdrop-blur-sm"
+            className="pointer-events-auto h-20 w-20 sm:h-26 sm:w-26 rounded-full bg-slate-900/70 border-2 border-cyan-500/45 relative flex items-center justify-center touch-none shadow-2xl backdrop-blur-sm ml-1"
           >
             <div
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-cyan-400/90 border-2 border-white shadow-lg transition-transform duration-75 flex items-center justify-center text-[9px] font-mono font-bold text-slate-950"
-              style={{ transform: `translate(${stickPos.x}px, ${stickPos.y}px)` }}
+              className="h-9 w-9 sm:h-11 sm:w-11 rounded-full bg-cyan-400/90 border-2 border-white shadow-lg transition-transform duration-75 flex items-center justify-center text-[8px] sm:text-[9px] font-mono font-bold text-slate-950"
+              style={{ transform: `translate(${stickPos.x * 0.8}px, ${stickPos.y * 0.8}px)` }}
             >
               MOVE
             </div>
           </div>
 
-          {/* Action buttons on right */}
-          <div className="pointer-events-auto flex flex-col items-center gap-2">
-            {/* Direct Attack button for combat */}
-            <button
-              onTouchStart={() => {
-                onAttack();
-              }}
-              onClick={() => {
-                onAttack();
-              }}
-              className="h-13 w-13 sm:h-15 sm:w-15 rounded-full bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 text-white font-black text-[11px] sm:text-xs shadow-xl shadow-rose-600/50 flex flex-col items-center justify-center active:scale-95 cursor-pointer border-2 border-rose-300"
-            >
-              <Sword className="h-4 w-4 sm:h-5 sm:w-5" />
-              <span>ATACAR</span>
-            </button>
-
+          {/* Right: Ergonomic Action Pad (Never overflows or gets cut off) */}
+          <div className="pointer-events-auto flex flex-col items-end gap-1.5 sm:gap-2 mr-0.5">
+            {/* Top Row of Action Pad: Weapon Switch + Primary Attack */}
             <div className="flex items-center gap-2">
               <button
-                onTouchStart={() => onTouchJump()}
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  const nextIdx = (WEAPONS_LIST.indexOf(equippedWeapon) + 1) % WEAPONS_LIST.length;
+                  onSelectWeapon(WEAPONS_LIST[nextIdx]);
+                  onSetToolMode('combat');
+                }}
+                onClick={() => {
+                  const nextIdx = (WEAPONS_LIST.indexOf(equippedWeapon) + 1) % WEAPONS_LIST.length;
+                  onSelectWeapon(WEAPONS_LIST[nextIdx]);
+                  onSetToolMode('combat');
+                }}
+                className="h-10 px-2.5 rounded-full bg-slate-900/85 border border-rose-500/50 text-rose-300 font-bold text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer backdrop-blur-sm"
+              >
+                <span className="text-[8px] text-slate-400 font-mono">ARMA</span>
+                <span className="text-white font-extrabold">{WEAPON_DEFINITIONS[equippedWeapon].name.split(' ')[0]}</span>
+              </button>
+
+              <button
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  onSetToolMode('combat');
+                  onAttack();
+                }}
+                onClick={() => {
+                  onSetToolMode('combat');
+                  onAttack();
+                }}
+                className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 text-white font-black text-[10px] sm:text-xs shadow-xl shadow-rose-600/50 flex flex-col items-center justify-center active:scale-95 cursor-pointer border-2 border-rose-300"
+              >
+                <Sword className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span>ATACAR</span>
+              </button>
+            </div>
+
+            {/* Bottom Row of Action Pad: Jump + Mine + Place */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  onTouchJump();
+                }}
                 onClick={() => onTouchJump()}
-                className="h-11 w-11 sm:h-12 sm:w-12 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black text-[10px] sm:text-[11px] shadow-xl shadow-cyan-500/40 flex items-center justify-center active:scale-95 cursor-pointer"
+                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black text-[9px] sm:text-[10px] shadow-xl shadow-cyan-500/40 flex items-center justify-center active:scale-95 cursor-pointer border border-white/60"
               >
                 SALTO
               </button>
 
               <button
-                onTouchStart={() => {
+                onTouchStart={(e) => {
+                  e.preventDefault();
                   onSetToolMode('mine');
                   onTouchAction();
                 }}
@@ -774,13 +892,19 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   onSetToolMode('mine');
                   onTouchAction();
                 }}
-                className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-slate-800 text-slate-200 border border-slate-700 font-bold text-[9px] shadow-lg flex items-center justify-center active:scale-95 cursor-pointer"
+                className={`h-10 w-10 sm:h-11 sm:w-11 rounded-full font-bold text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer border ${
+                  toolMode === 'mine'
+                    ? 'bg-amber-500 text-slate-950 border-white shadow-amber-500/40'
+                    : 'bg-slate-800/90 text-amber-300 border-amber-500/40'
+                }`}
               >
-                MINAR
+                <Pickaxe className="h-3.5 w-3.5" />
+                <span>MINAR</span>
               </button>
 
               <button
-                onTouchStart={() => {
+                onTouchStart={(e) => {
+                  e.preventDefault();
                   onSetToolMode('place');
                   onTouchAction();
                 }}
@@ -788,9 +912,14 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   onSetToolMode('place');
                   onTouchAction();
                 }}
-                className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-emerald-600 text-white font-bold text-[9px] shadow-lg flex items-center justify-center active:scale-95 cursor-pointer"
+                className={`h-10 w-10 sm:h-11 sm:w-11 rounded-full font-bold text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer border ${
+                  toolMode === 'place'
+                    ? 'bg-emerald-500 text-slate-950 border-white shadow-emerald-500/40'
+                    : 'bg-emerald-700/90 text-white border-emerald-400/50'
+                }`}
               >
-                PONER
+                <Hammer className="h-3.5 w-3.5" />
+                <span>PONER</span>
               </button>
             </div>
           </div>
@@ -798,7 +927,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       )}
 
       {/* Unified Bottom Control Dock (Consolidated, Zero-occlusion, Collapsible) */}
-      <div className="pointer-events-auto mx-auto w-full max-w-4xl flex flex-col items-center">
+      <div className="pointer-events-auto mx-auto w-full max-w-4xl flex flex-col items-center mt-auto z-20">
         {/* Collapse / Expand Tab Button */}
         <button
           onClick={() => {

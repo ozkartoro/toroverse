@@ -1221,7 +1221,7 @@ export default function App() {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-950 font-sans select-none">
+    <div className="relative w-screen h-screen h-[100dvh] overflow-hidden bg-slate-950 font-sans select-none">
       {/* 3D WebGL Canvas isolated container */}
       <div ref={canvasMountRef} className="absolute inset-0 z-0 touch-none" />
 

@@ -71,8 +71,22 @@ export const MiniMap: React.FC<MiniMapProps> = ({
   // Rotate map with player vs North-up
   const [rotateWithPlayer, setRotateWithPlayer] = useState(true);
 
-  // Collapsed state
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // Collapsed state (Defaults to collapsed on mobile / compact screens so it doesn't cover the 3D view)
+  const [isMobileView, setIsMobileView] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && (window.innerWidth < 1024 || window.innerHeight < 580);
+  });
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && (window.innerWidth < 1024 || window.innerHeight < 580);
+  });
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth < 1024 || window.innerHeight < 580;
+      setIsMobileView(mobile);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   // Hovered blip tooltip
   const [hoveredBlip, setHoveredBlip] = useState<{
@@ -428,63 +442,86 @@ export const MiniMap: React.FC<MiniMapProps> = ({
     setRotateWithPlayer((prev) => !prev);
   };
 
+  const radarSize = isMobileView ? 108 : 156;
+
   return (
-    <div className="pointer-events-auto flex flex-col items-end gap-1.5 select-none">
-      {/* Mini-map Container */}
-      <div className="relative rounded-2xl bg-slate-950/85 border border-cyan-500/35 p-2 shadow-2xl backdrop-blur-md flex flex-col items-center">
-        {/* Top Header: Island name & collapse/expand controls */}
-        <div className="w-full flex items-center justify-between gap-2 border-b border-slate-800/80 pb-1.5 mb-1 px-1">
-          <div className="flex items-center gap-1.5 overflow-hidden">
-            <Crosshair className="h-3.5 w-3.5 text-cyan-400 animate-spin-slow flex-shrink-0" />
-            <span className="text-[11px] font-bold text-white truncate max-w-[110px] sm:max-w-[130px]">
-              {islandName.split(':')[0]}
+    <div className="pointer-events-auto flex flex-col items-end gap-1 select-none">
+      {/* Compact Pill when Collapsed */}
+      {isCollapsed ? (
+        <button
+          onClick={() => {
+            sound.playClick();
+            setIsCollapsed(false);
+          }}
+          title="Expandir Mini-Mapa Radar"
+          className="flex items-center gap-1.5 rounded-xl bg-slate-950/85 border border-cyan-500/40 px-2.5 py-1.5 shadow-lg backdrop-blur-md hover:border-cyan-400 transition cursor-pointer"
+        >
+          <Crosshair className="h-3.5 w-3.5 text-cyan-400 animate-spin-slow flex-shrink-0" />
+          <span className="text-[10px] font-mono font-bold text-white">
+            Mapa ({Math.round(playerX)}, {Math.round(playerZ)})
+          </span>
+          {stats.enemiesInRange > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] font-mono text-rose-400 font-bold">
+              ⚔️{stats.enemiesInRange}
             </span>
+          )}
+          <Maximize2 className="h-3 w-3 text-cyan-300 ml-0.5" />
+        </button>
+      ) : (
+        /* Expanded Mini-map Container */
+        <div className="relative rounded-2xl bg-slate-950/85 border border-cyan-500/35 p-1.5 sm:p-2 shadow-2xl backdrop-blur-md flex flex-col items-center">
+          {/* Top Header: Island name & collapse/expand controls */}
+          <div className="w-full flex items-center justify-between gap-1.5 border-b border-slate-800/80 pb-1 mb-1 px-1">
+            <div className="flex items-center gap-1 overflow-hidden">
+              <Crosshair className="h-3 w-3 text-cyan-400 animate-spin-slow flex-shrink-0" />
+              <span className="text-[10px] sm:text-[11px] font-bold text-white truncate max-w-[75px] sm:max-w-[125px]">
+                {islandName.split(':')[0]}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              {/* Zoom toggle button */}
+              <button
+                onClick={handleCycleZoom}
+                title={`Rango de radar: ${currentRadius}m (Clic para cambiar)`}
+                className="px-1 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-[9px] font-mono text-cyan-300 hover:text-white hover:bg-slate-800 transition"
+              >
+                {currentRadius}m
+              </button>
+
+              {/* Compass lock / rotate toggle */}
+              <button
+                onClick={handleToggleRotate}
+                title={rotateWithPlayer ? 'Modo: Orientación de Jugador' : 'Modo: Norte Fijo'}
+                className={`p-1 rounded border transition ${
+                  rotateWithPlayer
+                    ? 'bg-cyan-950/70 border-cyan-500/40 text-cyan-300'
+                    : 'bg-slate-900 border-slate-700/80 text-slate-400 hover:text-white'
+                }`}
+              >
+                <Navigation className={`h-2.5 w-2.5 ${rotateWithPlayer ? 'rotate-45' : ''}`} />
+              </button>
+
+              {/* Collapse toggle */}
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  setIsCollapsed(true);
+                }}
+                title="Minimizar mini-mapa"
+                className="p-1 rounded bg-slate-900 border border-slate-700/80 text-slate-400 hover:text-white transition"
+              >
+                <Minimize2 className="h-2.5 w-2.5" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            {/* Zoom toggle button */}
-            <button
-              onClick={handleCycleZoom}
-              title={`Rango de radar: ${currentRadius}m (Clic para cambiar)`}
-              className="px-1.5 py-0.5 rounded-lg bg-slate-900 border border-slate-700/80 text-[10px] font-mono text-cyan-300 hover:text-white hover:bg-slate-800 transition"
-            >
-              {currentRadius}m
-            </button>
-
-            {/* Compass lock / rotate toggle */}
-            <button
-              onClick={handleToggleRotate}
-              title={rotateWithPlayer ? 'Modo: Orientación de Jugador' : 'Modo: Norte Fijo'}
-              className={`p-1 rounded-lg border transition ${
-                rotateWithPlayer
-                  ? 'bg-cyan-950/70 border-cyan-500/40 text-cyan-300'
-                  : 'bg-slate-900 border-slate-700/80 text-slate-400 hover:text-white'
-              }`}
-            >
-              <Navigation className={`h-3 w-3 ${rotateWithPlayer ? 'rotate-45' : ''}`} />
-            </button>
-
-            {/* Collapse toggle */}
-            <button
-              onClick={() => {
-                sound.playClick();
-                setIsCollapsed(!isCollapsed);
-              }}
-              title={isCollapsed ? 'Expandir mini-mapa' : 'Minimizar mini-mapa'}
-              className="p-1 rounded-lg bg-slate-900 border border-slate-700/80 text-slate-400 hover:text-white transition"
-            >
-              {isCollapsed ? <Maximize2 className="h-3 w-3" /> : <Minimize2 className="h-3 w-3" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Radar Canvas Body */}
-        {!isCollapsed && (
-          <div className="relative flex items-center justify-center p-1">
+          {/* Radar Canvas Body */}
+          <div className="relative flex items-center justify-center p-0.5">
             <canvas
               ref={canvasRef}
-              width={160}
-              height={160}
+              width={radarSize}
+              height={radarSize}
               className="rounded-full shadow-inner"
             />
 
@@ -494,29 +531,29 @@ export const MiniMap: React.FC<MiniMapProps> = ({
             <div className="absolute bottom-1 left-1 w-2 h-2 border-b border-l border-cyan-400/50 pointer-events-none" />
             <div className="absolute bottom-1 right-1 w-2 h-2 border-b border-r border-cyan-400/50 pointer-events-none" />
           </div>
-        )}
 
-        {/* Bottom Coordinates & Threat Readout */}
-        <div className="w-full flex items-center justify-between gap-1 pt-1.5 border-t border-slate-800/80 px-1 text-[9px] font-mono">
-          <div className="text-slate-400">
-            X:<span className="text-cyan-300 font-bold ml-0.5">{Math.round(playerX)}</span> Z:
-            <span className="text-cyan-300 font-bold ml-0.5">{Math.round(playerZ)}</span>
-          </div>
+          {/* Bottom Coordinates & Threat Readout */}
+          <div className="w-full flex items-center justify-between gap-1 pt-1 border-t border-slate-800/80 px-1 text-[8px] sm:text-[9px] font-mono">
+            <div className="text-slate-400">
+              X:<span className="text-cyan-300 font-bold ml-0.5">{Math.round(playerX)}</span> Z:
+              <span className="text-cyan-300 font-bold ml-0.5">{Math.round(playerZ)}</span>
+            </div>
 
-          <div className="flex items-center gap-1.5">
-            {stats.enemiesInRange > 0 && (
-              <span className="flex items-center gap-0.5 text-rose-400 font-bold animate-pulse">
-                <span>⚔️</span>
-                <span>{stats.enemiesInRange}</span>
+            <div className="flex items-center gap-1">
+              {stats.enemiesInRange > 0 && (
+                <span className="flex items-center gap-0.5 text-rose-400 font-bold animate-pulse">
+                  <span>⚔️</span>
+                  <span>{stats.enemiesInRange}</span>
+                </span>
+              )}
+              <span className="flex items-center gap-0.5 text-amber-400">
+                <span>📍</span>
+                <span>{stats.poisInRange}</span>
               </span>
-            )}
-            <span className="flex items-center gap-0.5 text-amber-400">
-              <span>📍</span>
-              <span>{stats.poisInRange}</span>
-            </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
