@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect } from 'react';
-import { Play, User, Globe, Sparkles, Gamepad2, Layers, Cpu } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Play, User, Globe, Sparkles, Gamepad2, Layers, Cpu, Maximize2, Minimize2 } from 'lucide-react';
 import { sound } from '../audio/soundSystem';
 
 interface TitleScreenProps {
@@ -22,6 +22,57 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   onOpenStory,
   totalPoints,
 }) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      const doc = document as Document & { webkitFullscreenElement?: Element | null };
+      setIsFullscreen(Boolean(doc.fullscreenElement || doc.webkitFullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+    };
+  }, []);
+
+  const handleToggleFullscreen = async () => {
+    sound.playClick();
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element | null;
+      webkitExitFullscreen?: () => Promise<void>;
+    };
+    const root = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+    };
+    const activeFs = Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
+
+    if (!activeFs && !isFullscreen) {
+      try {
+        if (root.requestFullscreen) {
+          await root.requestFullscreen();
+        } else if (root.webkitRequestFullscreen) {
+          await root.webkitRequestFullscreen();
+        }
+      } catch {
+        // Fallback state for mobile browsers
+      }
+      setIsFullscreen(true);
+    } else {
+      try {
+        if (doc.exitFullscreen && doc.fullscreenElement) {
+          await doc.exitFullscreen();
+        } else if (doc.webkitExitFullscreen && doc.webkitFullscreenElement) {
+          await doc.webkitExitFullscreen();
+        }
+      } catch {
+        // Ignore
+      }
+      setIsFullscreen(false);
+    }
+  };
+
   // Listen for Enter or Space to quickly launch the game
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -54,15 +105,36 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            sound.playClick();
-            onOpenStory();
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-[11px] sm:text-xs font-semibold transition"
-        >
-          <Sparkles className="h-3.5 w-3.5" /> Bitácora de Victoria
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleFullscreen}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold transition cursor-pointer ${
+              isFullscreen
+                ? 'bg-amber-500/25 border-amber-400 text-amber-200 hover:bg-amber-500/35'
+                : 'bg-cyan-500/20 border-cyan-400/60 text-cyan-200 hover:bg-cyan-500/30'
+            }`}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="h-3.5 w-3.5 text-amber-300" /> Modo Normal
+              </>
+            ) : (
+              <>
+                <Maximize2 className="h-3.5 w-3.5 text-cyan-300" /> Pantalla Completa
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              sound.playClick();
+              onOpenStory();
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-[11px] sm:text-xs font-semibold transition"
+          >
+            <Sparkles className="h-3.5 w-3.5" /> Bitácora de Victoria
+          </button>
+        </div>
       </div>
 
       {/* Center: Bespoke Inline SVG Title Lockup over negative space */}
