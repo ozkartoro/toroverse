@@ -297,73 +297,87 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       <div className="flex flex-wrap items-start justify-between gap-1.5 sm:gap-2 w-full z-20">
         {/* Top-Left: Player, Health Bar & Island Cluster */}
         <div className="pointer-events-auto flex flex-col gap-1 max-w-[235px] sm:max-w-md">
-          <div className="flex flex-col gap-1 sm:gap-2 rounded-xl sm:rounded-2xl bg-slate-950/80 border border-cyan-500/30 p-1.5 sm:p-3 shadow-lg backdrop-blur-sm">
-            <div className="flex items-center justify-between gap-1.5 sm:gap-2">
-              <button
-                onClick={() => {
-                  sound.playClick();
-                  onOpenStory();
-                }}
-                className="flex items-center gap-1.5 sm:gap-2 hover:opacity-80 transition text-left min-w-0"
-              >
-                <div className="h-6 w-6 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-slate-950 text-[10px] sm:text-sm shadow-md shadow-cyan-500/30 flex-shrink-0">
-                  VT
+          {isFullscreen ? (
+            /* Ultra-compact status pill in Fullscreen Mode */
+            <div className="flex items-center gap-2 rounded-xl bg-slate-950/75 border border-cyan-500/30 px-2.5 py-1 shadow-md backdrop-blur-sm">
+              <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-emerald-400">
+                <Heart className="h-3 w-3 fill-current" />
+                <span>{health}/{maxHealth}</span>
+              </div>
+              <span className="text-slate-600">•</span>
+              <div className="text-[11px] font-mono font-extrabold text-amber-300 tabular-nums">
+                {points.toLocaleString()} PTS
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1 sm:gap-2 rounded-xl sm:rounded-2xl bg-slate-950/80 border border-cyan-500/30 p-1.5 sm:p-3 shadow-lg backdrop-blur-sm">
+              <div className="flex items-center justify-between gap-1.5 sm:gap-2">
+                <button
+                  onClick={() => {
+                    sound.playClick();
+                    onOpenStory();
+                  }}
+                  className="flex items-center gap-1.5 sm:gap-2 hover:opacity-80 transition text-left min-w-0"
+                >
+                  <div className="h-6 w-6 sm:h-9 sm:w-9 rounded-lg sm:rounded-xl bg-gradient-to-tr from-cyan-400 to-blue-600 flex items-center justify-center font-bold text-slate-950 text-[10px] sm:text-sm shadow-md shadow-cyan-500/30 flex-shrink-0">
+                    VT
+                  </div>
+                  <div className="overflow-hidden min-w-0">
+                    <div className="text-[11px] sm:text-sm font-bold text-white flex items-center gap-1 truncate">
+                      <span className="truncate">Victoria Toro</span>
+                      <span className="hidden sm:inline-block text-[9px] font-mono text-cyan-300 font-normal bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                        Nivel 5
+                      </span>
+                    </div>
+                    <div className="hidden sm:block text-[11px] text-slate-400 font-medium truncate">
+                      {activeWorld.name.split(':')[0]}
+                    </div>
+                  </div>
+                </button>
+
+                <div className="h-4 sm:h-6 w-px bg-slate-800 mx-0.5 flex-shrink-0" />
+
+                {/* In-game Points readout */}
+                <div className="text-right flex-shrink-0">
+                  <div className="hidden sm:block text-[9px] uppercase font-mono text-amber-400/80">Puntos Toro</div>
+                  <div className="text-[10px] sm:text-sm font-extrabold text-amber-300 font-mono tabular-nums">
+                    {points.toLocaleString()} PTS
+                  </div>
                 </div>
-                <div className="overflow-hidden min-w-0">
-                  <div className="text-[11px] sm:text-sm font-bold text-white flex items-center gap-1 truncate">
-                    <span className="truncate">Victoria Toro</span>
-                    <span className="hidden sm:inline-block text-[9px] font-mono text-cyan-300 font-normal bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/30">
-                      Nivel 5
+              </div>
+
+              {/* Health Bar (Barra de Salud de Victoria) */}
+              <div className="flex items-center gap-1.5 sm:gap-2 pt-0.5 sm:pt-1 border-t border-slate-800/80">
+                <div
+                  className={`flex items-center justify-center rounded-md p-0.5 sm:p-1 ${
+                    isLowHealth ? 'bg-rose-500/30 text-rose-400 animate-pulse' : 'bg-emerald-500/20 text-emerald-400'
+                  }`}
+                >
+                  <Heart className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 fill-current" />
+                </div>
+                <div className="flex-1 flex flex-col gap-0.5">
+                  <div className="flex items-center justify-between text-[8px] sm:text-[10px] font-mono leading-none">
+                    <span className="font-bold text-slate-300">SALUD</span>
+                    <span className={`font-bold ${isLowHealth ? 'text-rose-400 animate-bounce' : 'text-emerald-400'}`}>
+                      {health}/{maxHealth} HP
                     </span>
                   </div>
-                  <div className="hidden sm:block text-[11px] text-slate-400 font-medium truncate">
-                    {activeWorld.name.split(':')[0]}
+                  <div className="w-full h-1.5 sm:h-2 rounded-full bg-slate-800 overflow-hidden relative shadow-inner">
+                    <div
+                      className={`h-full transition-all duration-300 rounded-full ${
+                        healthPercent > 50
+                          ? 'bg-gradient-to-r from-emerald-500 to-cyan-400 shadow-[0_0_8px_#10b981]'
+                          : healthPercent > 25
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-400 shadow-[0_0_8px_#f59e0b]'
+                          : 'bg-gradient-to-r from-rose-600 to-red-500 shadow-[0_0_10px_#ef4444] animate-pulse'
+                      }`}
+                      style={{ width: `${healthPercent}%` }}
+                    />
                   </div>
                 </div>
-              </button>
-
-              <div className="h-4 sm:h-6 w-px bg-slate-800 mx-0.5 flex-shrink-0" />
-
-              {/* In-game Points readout */}
-              <div className="text-right flex-shrink-0">
-                <div className="hidden sm:block text-[9px] uppercase font-mono text-amber-400/80">Puntos Toro</div>
-                <div className="text-[10px] sm:text-sm font-extrabold text-amber-300 font-mono tabular-nums">
-                  {points.toLocaleString()} PTS
-                </div>
               </div>
             </div>
-
-            {/* Health Bar (Barra de Salud de Victoria) */}
-            <div className="flex items-center gap-1.5 sm:gap-2 pt-0.5 sm:pt-1 border-t border-slate-800/80">
-              <div
-                className={`flex items-center justify-center rounded-md p-0.5 sm:p-1 ${
-                  isLowHealth ? 'bg-rose-500/30 text-rose-400 animate-pulse' : 'bg-emerald-500/20 text-emerald-400'
-                }`}
-              >
-                <Heart className="h-2.5 w-2.5 sm:h-3.5 sm:w-3.5 fill-current" />
-              </div>
-              <div className="flex-1 flex flex-col gap-0.5">
-                <div className="flex items-center justify-between text-[8px] sm:text-[10px] font-mono leading-none">
-                  <span className="font-bold text-slate-300">SALUD</span>
-                  <span className={`font-bold ${isLowHealth ? 'text-rose-400 animate-bounce' : 'text-emerald-400'}`}>
-                    {health}/{maxHealth} HP
-                  </span>
-                </div>
-                <div className="w-full h-1.5 sm:h-2 rounded-full bg-slate-800 overflow-hidden relative shadow-inner">
-                  <div
-                    className={`h-full transition-all duration-300 rounded-full ${
-                      healthPercent > 50
-                        ? 'bg-gradient-to-r from-emerald-500 to-cyan-400 shadow-[0_0_8px_#10b981]'
-                        : healthPercent > 25
-                        ? 'bg-gradient-to-r from-amber-500 to-yellow-400 shadow-[0_0_8px_#f59e0b]'
-                        : 'bg-gradient-to-r from-rose-600 to-red-500 shadow-[0_0_10px_#ef4444] animate-pulse'
-                    }`}
-                    style={{ width: `${healthPercent}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Toast Notification message */}
           {notificationMessage && (
@@ -434,8 +448,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           )}
         </div>
 
-        {/* Dynamic Day/Night Celestial Clock Bar */}
-        {dayNightState && (
+        {/* Dynamic Day/Night Celestial Clock Bar (Hidden in Fullscreen mode to maximize 3D view) */}
+        {dayNightState && !isFullscreen && (
           <div className="pointer-events-auto flex items-center gap-1 rounded-xl sm:rounded-2xl bg-slate-950/80 border border-slate-800/80 p-1 sm:px-3 sm:py-2 shadow-lg backdrop-blur-sm">
             <button
               onClick={() => {
@@ -551,7 +565,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         )}
 
         {/* Dynamic Weather System Indicator & Controls */}
-        {weatherConfig && (
+        {weatherConfig && !isFullscreen && (
           <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl bg-slate-950/85 border border-slate-800/80 p-1.5 sm:px-3 sm:py-2 shadow-xl backdrop-blur-sm">
             <button
               onClick={() => {
@@ -618,6 +632,29 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         {/* Top-Right: Action Icons & Mini-Map Column */}
         <div className="pointer-events-auto flex flex-col items-end gap-1.5">
           <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap justify-end">
+            {/* Primary Fullscreen / Normal Mode Toggle Button (First for maximum visibility) */}
+            <button
+              onClick={handleToggleFullscreen}
+              title={isFullscreen ? 'Volver al Modo Normal' : 'Ver en Pantalla Completa'}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1 sm:py-2 rounded-xl border text-[11px] sm:text-xs font-extrabold transition shadow-lg backdrop-blur-sm cursor-pointer ${
+                isFullscreen
+                  ? 'bg-gradient-to-r from-amber-500/35 to-orange-500/35 border-amber-300 text-amber-100 hover:from-amber-500/50 hover:to-orange-500/50 shadow-amber-500/30 ring-1 ring-amber-400/50'
+                  : 'bg-gradient-to-r from-cyan-500/30 to-blue-600/30 border-cyan-300/80 text-cyan-100 hover:from-cyan-500/45 hover:to-blue-600/45 shadow-cyan-500/25'
+              }`}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-300 animate-pulse" />
+                  <span>Modo Normal</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-300" />
+                  <span>Pantalla Completa</span>
+                </>
+              )}
+            </button>
+
             {/* Storage & Crafting Button */}
             {onOpenCrafting && (
               <button
@@ -637,7 +674,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             )}
 
             {/* Story Quest Log Button */}
-            {onOpenQuestLog && (
+            {onOpenQuestLog && !isFullscreen && (
               <button
                 onClick={() => {
                   sound.playClick();
@@ -656,91 +693,78 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             )}
 
             {/* Weekly Event Pill Button */}
-            <button
-              onClick={() => {
-                sound.playClick();
-                onOpenWeeklyEvent();
-              }}
-              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-pink-500/40 text-pink-300 hover:bg-pink-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm`}
-            >
-              <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-pink-400 animate-pulse" />
-              <span className="hidden md:inline">Evento Neón</span>
-            </button>
+            {!isFullscreen && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onOpenWeeklyEvent();
+                }}
+                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-pink-500/40 text-pink-300 hover:bg-pink-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+              >
+                <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-pink-400 animate-pulse" />
+                <span className="hidden md:inline">Evento Neón</span>
+              </button>
+            )}
 
             {/* Marketplace Button */}
-            <button
-              onClick={() => {
-                sound.playClick();
-                onOpenMarketplace();
-              }}
-              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm`}
-            >
-              <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
-              <span className="hidden md:inline">Mercado</span>
-            </button>
+            {!isFullscreen && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onOpenMarketplace();
+                }}
+                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+              >
+                <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
+                <span className="hidden md:inline">Mercado</span>
+              </button>
+            )}
 
             {/* Avatar Customizer Button */}
-            <button
-              onClick={() => {
-                sound.playClick();
-                onOpenAvatar();
-              }}
-              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm`}
-            >
-              <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden md:inline">Avatar</span>
-            </button>
+            {!isFullscreen && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onOpenAvatar();
+                }}
+                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+              >
+                <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden md:inline">Avatar</span>
+              </button>
+            )}
 
             {/* World Editor Button */}
-            <button
-              onClick={() => {
-                sound.playClick();
-                onOpenWorldEditor();
-              }}
-              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm`}
-            >
-              <Globe className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              <span className="hidden md:inline">Islas</span>
-            </button>
+            {!isFullscreen && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onOpenWorldEditor();
+                }}
+                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+              >
+                <Globe className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden md:inline">Islas</span>
+              </button>
+            )}
 
             {/* Emotes Button */}
-            <button
-              onClick={() => {
-                sound.playClick();
-                onOpenEmotes();
-              }}
-              className={`${isFullscreen ? 'hidden sm:flex' : 'flex'} items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm ${
-                activeEmote
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border border-pink-300 shadow-pink-500/40 animate-pulse'
-                  : 'bg-slate-950/85 border border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
-              }`}
-            >
-              <span className="text-xs sm:text-sm">💃</span>
-              <span className="hidden md:inline">Emotes [B]</span>
-            </button>
-
-            {/* Fullscreen / Normal Mode Toggle Button */}
-            <button
-              onClick={handleToggleFullscreen}
-              title={isFullscreen ? 'Volver al Modo Normal' : 'Activar Pantalla Completa'}
-              className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl border text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm cursor-pointer ${
-                isFullscreen
-                  ? 'bg-amber-500/25 border-amber-400 text-amber-200 hover:bg-amber-500/35 shadow-amber-500/20'
-                  : 'bg-cyan-500/20 border-cyan-400/60 text-cyan-200 hover:bg-cyan-500/30 shadow-cyan-500/15'
-              }`}
-            >
-              {isFullscreen ? (
-                <>
-                  <Minimize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-300" />
-                  <span>Modo Normal</span>
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-cyan-300" />
-                  <span>Pantalla Completa</span>
-                </>
-              )}
-            </button>
+            {!isFullscreen && (
+              <button
+                onClick={() => {
+                  sound.playClick();
+                  onOpenEmotes();
+                }}
+                className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm ${
+                  activeEmote
+                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border border-pink-300 shadow-pink-500/40 animate-pulse'
+                    : 'bg-slate-950/85 border border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
+                }`}
+              >
+                <span className="text-xs sm:text-sm">💃</span>
+                <span className="hidden md:inline">Emotes [B]</span>
+              </button>
+            )}
 
             {/* Toggle Touch Controls Button */}
             <button
@@ -781,21 +805,23 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </button>
           </div>
 
-          {/* Dynamic Radar Mini-Map (Starts collapsed as a sleek pill on mobile so it never blocks the view) */}
-          <MiniMap
-            playerX={playerX ?? 0}
-            playerY={playerY ?? 0}
-            playerZ={playerZ ?? 0}
-            playerYaw={playerYaw ?? 0}
-            enemies={minimapEnemies ?? []}
-            pois={minimapPois ?? []}
-            islandName={activeWorld.name}
-          />
+          {/* Dynamic Radar Mini-Map (Starts collapsed as a sleek pill on mobile, hidden in Fullscreen mode) */}
+          {!isFullscreen && (
+            <MiniMap
+              playerX={playerX ?? 0}
+              playerY={playerY ?? 0}
+              playerZ={playerZ ?? 0}
+              playerYaw={playerYaw ?? 0}
+              enemies={minimapEnemies ?? []}
+              pois={minimapPois ?? []}
+              islandName={activeWorld.name}
+            />
+          )}
         </div>
       </div>
 
-      {/* Middle-Left: Unobtrusive Chat Ticker (Hidden on compact mobile screens to keep 3D view clear) */}
-      {recentChat && (
+      {/* Middle-Left: Unobtrusive Chat Ticker (Hidden on compact mobile screens and Fullscreen mode to keep 3D view clear) */}
+      {recentChat && !isFullscreen && (
         <div className="hidden md:block pointer-events-none my-auto max-w-xs sm:max-w-sm rounded-xl bg-slate-950/75 border border-slate-800 p-2 sm:p-2.5 text-xs text-slate-200 shadow-md backdrop-blur-sm">
           <div className="flex items-center gap-1.5 font-bold text-cyan-400 text-[10px] sm:text-[11px] mb-0.5">
             <MessageSquare className="h-3 w-3" />
