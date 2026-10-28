@@ -1,0 +1,6 @@
+{
+  "name": "Toroverse: El Cataclismo Creativo",
+  "description": "Juego 3D multijugador tipo Roblox/Minecraft con Victoria Toro, editor de mundos vóxel, personalización profunda de avatares, mercado de creadores y scripting visual.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
