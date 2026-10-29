@@ -1034,6 +1034,147 @@ class SoundSystem {
     osc.stop(now + 0.2);
   }
 
+  /**
+   * Minecraft-style Eating / Munching sound effect with satisfying swallow
+   */
+  public playEat() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const baseNow = this.ctx.currentTime;
+    // 3 crunchy bites
+    [0, 0.09, 0.18].forEach((offset) => {
+      if (!this.ctx || !this.masterGain) return;
+      const now = baseNow + offset;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(320 + Math.random() * 240, now);
+      osc.frequency.exponentialRampToValueAtTime(140 + Math.random() * 80, now + 0.07);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(1600 + Math.random() * 600, now);
+      filter.Q.setValueAtTime(2.5, now);
+
+      gain.gain.setValueAtTime(0.28, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(now);
+      osc.stop(now + 0.08);
+    });
+
+    // Satisfying swallow chime
+    const swallowNow = baseNow + 0.26;
+    const oscSwallow = this.ctx.createOscillator();
+    const gainSwallow = this.ctx.createGain();
+    oscSwallow.type = 'sine';
+    oscSwallow.frequency.setValueAtTime(440, swallowNow);
+    oscSwallow.frequency.exponentialRampToValueAtTime(680, swallowNow + 0.16);
+    gainSwallow.gain.setValueAtTime(0.22, swallowNow);
+    gainSwallow.gain.exponentialRampToValueAtTime(0.001, swallowNow + 0.18);
+
+    oscSwallow.connect(gainSwallow);
+    gainSwallow.connect(this.masterGain);
+    oscSwallow.start(swallowNow);
+    oscSwallow.stop(swallowNow + 0.18);
+  }
+
+  /**
+   * Dog/Wolf taming success chime (hearts melody)
+   */
+  public playTame() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const baseNow = this.ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    notes.forEach((freq, idx) => {
+      if (!this.ctx || !this.masterGain) return;
+      const now = baseNow + idx * 0.08;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.start(now);
+      osc.stop(now + 0.22);
+    });
+  }
+
+  /**
+   * Block chipping sound while progressively mining
+   */
+  public playBlockChip(surface: string = 'stone') {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    if (surface === 'wood') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(260 + Math.random() * 50, now);
+      osc.frequency.exponentialRampToValueAtTime(120, now + 0.06);
+      gain.gain.setValueAtTime(0.2, now);
+    } else {
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(750 + Math.random() * 200, now);
+      osc.frequency.exponentialRampToValueAtTime(280, now + 0.05);
+      gain.gain.setValueAtTime(0.18, now);
+    }
+
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(now);
+    osc.stop(now + 0.06);
+  }
+
+  /**
+   * Armor deflection sound when cyber-armor absorbs damage
+   */
+  public playArmorDefend() {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.masterGain) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(1760, now + 0.05);
+    osc.frequency.exponentialRampToValueAtTime(440, now + 0.14);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+    osc.connect(gain);
+    gain.connect(this.masterGain);
+
+    osc.start(now);
+    osc.stop(now + 0.16);
+  }
+
   public startAmbientMelody() {
     if (this.isMuted || this.musicPlaying) return;
     this.initContext();

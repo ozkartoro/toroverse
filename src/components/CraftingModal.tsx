@@ -17,6 +17,7 @@ import {
   Heart,
   Skull,
   Pickaxe,
+  Flame,
 } from 'lucide-react';
 import {
   BlockId,
@@ -44,6 +45,7 @@ interface CraftingModalProps {
   onUpgradeWeaponDamage: () => void;
   weaponDamageMultiplier: number;
   onEarnPoints: (points: number, reason: string) => void;
+  onEquipArmor?: (piece: 'helmet' | 'chestplate') => void;
   onSpawnNpcWave?: () => void;
   onSpawnAnimalHerd?: () => void;
 }
@@ -59,10 +61,11 @@ export const CraftingModal: React.FC<CraftingModalProps> = ({
   onUpgradeWeaponDamage,
   weaponDamageMultiplier,
   onEarnPoints,
+  onEquipArmor,
   onSpawnNpcWave,
   onSpawnAnimalHerd,
 }) => {
-  const [activeTab, setActiveTab] = useState<'fusion' | 'recipes' | 'storage'>('fusion');
+  const [activeTab, setActiveTab] = useState<'fusion' | 'recipes' | 'smelting' | 'storage'>('fusion');
   const [recipeFilter, setRecipeFilter] = useState<'todos' | 'bloques' | 'mecanismos' | 'supervivencia' | 'armas'>('todos');
   const [materialFilter, setMaterialFilter] = useState<
     'todos' | 'disponibles' | 'bloque_natural' | 'bloque_avanzado' | 'recurso_animal' | 'botin_enemigo'
@@ -149,7 +152,15 @@ export const CraftingModal: React.FC<CraftingModalProps> = ({
       showTempFeedback(`🍖 ¡Banquete consumido! Recuperaste +${recipe.outputCount} HP.`);
     } else if (recipe.resultType === 'max_hp') {
       onUpgradeMaxHp(recipe.outputCount);
-      showTempFeedback(`🛡️ ¡Armadura equipada! Salud máxima aumentada en +${recipe.outputCount} HP.`);
+      if (recipe.id === 'craft_cyber_helmet') {
+        onEquipArmor?.('helmet');
+        showTempFeedback(`🪖 ¡Casco Sombra equipado! +30 Salud Máx y +25% Reducción de Daño.`);
+      } else if (recipe.id === 'craft_nano_armor') {
+        onEquipArmor?.('chestplate');
+        showTempFeedback(`🛡️ ¡Pechera Nano equipada! +25 Salud Máx y +35% Reducción de Daño.`);
+      } else {
+        showTempFeedback(`🛡️ ¡Blindaje equipado! Salud máxima aumentada en +${recipe.outputCount} HP.`);
+      }
     } else if (recipe.resultType === 'weapon_upgrade') {
       onUpgradeWeaponDamage();
       showTempFeedback(`⚔️ ¡Armas sobrecargadas! Daño de todas tus armas aumentado +25%.`);
@@ -374,6 +385,20 @@ export const CraftingModal: React.FC<CraftingModalProps> = ({
               }`}
             >
               <Hammer className="h-4 w-4" /> Recetas Tipo Minecraft ({CRAFTING_RECIPES.length})
+            </button>
+
+            <button
+              onClick={() => {
+                sound.playClick();
+                setActiveTab('smelting');
+              }}
+              className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+                activeTab === 'smelting'
+                  ? 'bg-gradient-to-r from-rose-500 via-amber-500 to-yellow-500 text-slate-950 shadow-md shadow-orange-500/30'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Flame className="h-4 w-4 text-orange-400 animate-pulse" /> Horno y Cocina Cuántica
             </button>
 
             <button
@@ -706,6 +731,119 @@ export const CraftingModal: React.FC<CraftingModalProps> = ({
                         >
                           <Hammer className="h-3.5 w-3.5" />
                           {affordable ? 'Unir y Fabricar Ahora' : 'Faltan Materiales'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: HORNO Y COCINA CUÁNTICA */}
+          {activeTab === 'smelting' && (
+            <div className="space-y-4">
+              {/* Furnace Header & Fuel Display */}
+              <div className="rounded-2xl border-2 border-orange-500/40 bg-gradient-to-r from-orange-950/40 via-slate-950/90 to-rose-950/40 p-4 shadow-xl flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-500 to-rose-600 flex items-center justify-center text-2xl shadow-lg shadow-orange-500/30 border border-amber-300">
+                    🔥
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                      Horno Cuántico de Fundición y Cocina
+                    </h3>
+                    <p className="text-xs text-slate-300">
+                      Usa 🪵 Madera Digital como combustible para cocinar carne y fundir minerales a alta temperatura.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-slate-900/90 border border-amber-500/30 px-3 py-1.5 rounded-xl text-xs font-mono">
+                  <span className="text-slate-400">Combustible disponible:</span>
+                  <span className="font-black text-amber-300">
+                    🪵 {(inventory.wood ?? 0)}x Madera
+                  </span>
+                </div>
+              </div>
+
+              {/* Smelting Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {CRAFTING_RECIPES.filter(
+                  (r) =>
+                    r.id.startsWith('craft_smelt_') ||
+                    r.id === 'craft_torches' ||
+                    r.id === 'craft_heal_feast'
+                ).map((recipe) => {
+                  const affordable = canAffordRecipe(recipe);
+                  return (
+                    <div
+                      key={recipe.id}
+                      className="rounded-2xl border border-orange-500/30 bg-slate-950/80 p-4 shadow-lg hover:border-orange-400/60 transition flex flex-col justify-between gap-3"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="h-10 w-10 rounded-xl bg-orange-500/20 border border-orange-400/40 flex items-center justify-center text-xl shadow-inner flex-shrink-0">
+                              {recipe.emoji}
+                            </div>
+                            <div>
+                              <div className="font-extrabold text-white text-sm">
+                                {recipe.name}
+                              </div>
+                              <div className="text-[10px] font-mono text-orange-300">
+                                Fundición & Cocina en Horno
+                              </div>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-md bg-orange-500/20 text-orange-200 text-xs font-mono font-bold">
+                            +{recipe.bonusPoints} PTS
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                          {recipe.description}
+                        </p>
+                      </div>
+
+                      <div className="space-y-2 pt-2 border-t border-slate-800">
+                        <div className="text-[10px] font-mono uppercase text-slate-400">
+                          Ingredientes y Combustible:
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {recipe.ingredients.map((ing) => {
+                            const matDef = MATERIAL_DEFINITIONS[ing.materialId];
+                            const have = inventory[ing.materialId] ?? 0;
+                            const ok = have >= ing.count;
+                            return (
+                              <span
+                                key={ing.materialId}
+                                className={`px-2 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1 border ${
+                                  ok
+                                    ? 'bg-emerald-950/70 border-emerald-500/40 text-emerald-300'
+                                    : 'bg-rose-950/60 border-rose-500/40 text-rose-300'
+                                }`}
+                              >
+                                <span>{matDef.emoji}</span>
+                                <span>{matDef.name}:</span>
+                                <span>
+                                  {have}/{ing.count}
+                                </span>
+                              </span>
+                            );
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() => handleCraftRecipe(recipe)}
+                          disabled={!affordable}
+                          className={`w-full mt-2 py-2 rounded-xl font-black text-xs uppercase tracking-wider transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            affordable
+                              ? 'bg-gradient-to-r from-orange-500 to-rose-600 hover:from-orange-400 hover:to-rose-500 text-white shadow-md shadow-orange-500/30'
+                              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                          }`}
+                        >
+                          <Flame className="h-3.5 w-3.5 text-yellow-300" />
+                          {affordable ? '🔥 Fundir / Cocinar en Horno' : 'Faltan Ingredientes'}
                         </button>
                       </div>
                     </div>

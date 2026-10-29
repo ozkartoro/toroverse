@@ -134,6 +134,9 @@ export interface AnimalEntity {
   targetZ: number;
   hp: number;
   maxHp: number;
+  isTamed?: boolean;
+  ownerName?: string;
+  targetEnemyId?: string | null;
 }
 
 export type MaterialId =
@@ -308,6 +311,8 @@ export interface AvatarCustomization {
   backAccessory: BackAccessoryId;
   faceExpression: FaceExpressionId;
   scale: number;
+  armorHelmet?: boolean;
+  armorChestplate?: boolean;
 }
 
 export interface MarketplaceItem {

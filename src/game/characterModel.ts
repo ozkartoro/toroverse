@@ -553,11 +553,17 @@ export function createVoxelCharacter(initialCustom: AvatarCustomization): VoxelC
   backGroup.position.set(0, 0.1, -0.22);
   torso.add(backGroup);
 
+  // Armor Group for Equipped Cyber-Armor
+  const armorGroup = new THREE.Group();
+  armorGroup.name = 'ArmorGroup';
+  torso.add(armorGroup);
+
   // Procedural Builder for 21 Hair Styles, 21 Headwear, 21 Back Items
   function buildAccessories(custom: AvatarCustomization) {
     while (hairGroup.children.length > 0) hairGroup.remove(hairGroup.children[0]);
     while (headwearGroup.children.length > 0) headwearGroup.remove(headwearGroup.children[0]);
     while (backGroup.children.length > 0) backGroup.remove(backGroup.children[0]);
+    while (armorGroup.children.length > 0) armorGroup.remove(armorGroup.children[0]);
 
     // 1. Hair Styles (21 options)
     const hStyle = custom.hairStyle;
@@ -797,6 +803,68 @@ export function createVoxelCharacter(initialCustom: AvatarCustomization): VoxelC
       const pack = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.55, 0.25), packMat);
       pack.position.set(0, 0, -0.15);
       backGroup.add(pack);
+    }
+
+    // 4. Equipped Cyber-Armor Visibles (Casco Sombra y Pechera Nano)
+    if (custom.armorHelmet) {
+      const helmetMat = new THREE.MeshStandardMaterial({
+        color: 0x1e1b4b,
+        metalness: 0.9,
+        roughness: 0.2,
+        emissive: 0x4338ca,
+        emissiveIntensity: 0.45,
+      });
+      const visorMat = new THREE.MeshStandardMaterial({
+        color: 0x00f5d4,
+        emissive: 0x00f5d4,
+        emissiveIntensity: 0.95,
+        roughness: 0.1,
+      });
+
+      // Helmet armor shell enclosing head
+      const helmet = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.74, 0.74), helmetMat);
+      helmet.position.set(0, 0, 0);
+
+      // Glowing tactical visor
+      const visor = new THREE.Mesh(new THREE.BoxGeometry(0.64, 0.16, 0.12), visorMat);
+      visor.position.set(0, 0, 0.36);
+
+      // Crest antenna
+      const crest = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.74), visorMat);
+      crest.position.set(0, 0.42, 0);
+
+      headwearGroup.add(helmet, visor, crest);
+    }
+
+    if (custom.armorChestplate) {
+      const plateMat = new THREE.MeshStandardMaterial({
+        color: 0x312e81,
+        metalness: 0.85,
+        roughness: 0.25,
+        emissive: 0x6366f1,
+        emissiveIntensity: 0.4,
+      });
+      const trimMat = new THREE.MeshStandardMaterial({
+        color: 0x00f5d4,
+        emissive: 0x00f5d4,
+        emissiveIntensity: 0.85,
+      });
+
+      // Reinforced chest armor
+      const chest = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.92, 0.46), plateMat);
+      chest.position.set(0, 0, 0);
+
+      // Arc reactor core in chest center
+      const core = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.12), trimMat);
+      core.position.set(0, 0.12, 0.24);
+
+      // Left & right shoulder pauldrons
+      const leftPauldron = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.46), plateMat);
+      leftPauldron.position.set(-0.52, 0.42, 0);
+      const rightPauldron = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.46), plateMat);
+      rightPauldron.position.set(0.52, 0.42, 0);
+
+      armorGroup.add(chest, core, leftPauldron, rightPauldron);
     }
   }
 

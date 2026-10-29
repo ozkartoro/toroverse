@@ -123,6 +123,8 @@ export default function App() {
     }
     return VICTORIA_TORO_CUSTOMIZATION;
   });
+  const avatarCustomRef = useRef<AvatarCustomization>(avatarCustom);
+  avatarCustomRef.current = avatarCustom;
 
   // Hotbar, Weapons & Tool selection
   const [activeBlock, setActiveBlock] = useState<BlockId>('neon_cyan');
@@ -380,6 +382,61 @@ export default function App() {
     }
   };
 
+  // Consume food in real-time (Minecraft-style eating: restores health or tames nearby Cyber-Dogs)
+  const handleEatFood = () => {
+    const currentMeat = materialInventory.neon_meat ?? 0;
+    if (currentMeat <= 0) {
+      setNotification('🍖 ¡No tienes Carne Neón en tu inventario! Caza cerditos u ovejas para conseguirla');
+      setTimeout(() => setNotification(null), 2500);
+      return;
+    }
+
+    // Check if player is near a wild Cyber-Dog to tame it first!
+    if (playerCtrlRef.current && combatRef.current) {
+      const nearbyDog = combatRef.current.getNearbyUntamedDog(playerCtrlRef.current.position, 4.5);
+      if (nearbyDog) {
+        setMaterialInventory((prev) => {
+          const next = { ...prev, neon_meat: Math.max(0, (prev.neon_meat ?? 1) - 1) };
+          safeStorageSet('toroverse_materials_v1', JSON.stringify(next));
+          return next;
+        });
+
+        combatRef.current.tameAnimal(nearbyDog.id, 'Victoria Toro');
+        addPoints(120, '¡Lobo Cibernético Domesticado!');
+        setNotification('🐕‍🦺 ¡Has domesticado un Lobo Guardián! Ahora te sigue y te defenderá contra todos los enemigos');
+        setTimeout(() => setNotification(null), 3200);
+        return;
+      }
+    }
+
+    if (health >= maxHealth) {
+      setNotification('✨ ¡Tu salud ya está al máximo! (100 HP)');
+      setTimeout(() => setNotification(null), 2000);
+      return;
+    }
+
+    // Deduct 1 meat from inventory
+    setMaterialInventory((prev) => {
+      const next = { ...prev, neon_meat: Math.max(0, (prev.neon_meat ?? 1) - 1) };
+      safeStorageSet('toroverse_materials_v1', JSON.stringify(next));
+      return next;
+    });
+
+    // Play eating sound sequence & visual particles
+    sound.playEat();
+    const p = playerCtrlRef.current?.position;
+    if (p && combatRef.current?.particleManager) {
+      combatRef.current.particleManager.spawnSparks(p.x, p.y + 1.2, p.z, 0x10b981, 18, 4.0);
+      combatRef.current.particleManager.spawnRing(p.x, p.y + 0.3, p.z, 0x34d399, 2.4);
+    }
+
+    const healAmount = 28;
+    setHealth((prev) => Math.min(maxHealth, prev + healAmount));
+    addPoints(15, 'Carne Neón Consumida');
+    setNotification(`🍖 ¡Ñam! Carne Neón consumida · +${healAmount} HP restaurados`);
+    setTimeout(() => setNotification(null), 2200);
+  };
+
   // Handle Emote Trigger
   const handleSelectEmote = (emote: EmoteDefinition) => {
     if (!playerCtrlRef.current) return;
@@ -567,13 +624,29 @@ export default function App() {
     // Callback when player takes damage from hostile creature
     combatManager.onPlayerDamaged = (damage, attackerName) => {
       playerCtrlRef.current?.triggerCameraShake(0.28, 0.25);
+      const cur = avatarCustomRef.current;
+      const helmetRed = cur?.armorHelmet ? 0.25 : 0;
+      const chestRed = cur?.armorChestplate ? 0.35 : 0;
+      const totalRed = helmetRed + chestRed;
+      const effectiveDamage = Math.max(1, Math.round(damage * (1 - totalRed)));
+
+      if (totalRed > 0) {
+        sound.playArmorDefend();
+        const p = playerCtrlRef.current?.position;
+        if (p && combatRef.current?.particleManager) {
+          combatRef.current.particleManager.spawnSparks(p.x, p.y + 1.2, p.z, 0x00f5d4, 16, 3.8);
+        }
+      } else {
+        sound.playPlayerHurt();
+      }
+
       setHealth((prev) => {
-        const next = Math.max(0, prev - damage);
+        const next = Math.max(0, prev - effectiveDamage);
         if (next <= 0) {
           sound.playPlayerHurt();
           setNotification(`¡Victoria Toro fue derribada por ${attackerName}! Reapareciendo en el Nexo...`);
           setTimeout(() => {
-            setHealth(100);
+            setHealth(maxHealth);
             if (playerCtrlRef.current) {
               playerCtrlRef.current.teleport(
                 activeWorld.spawnPoint[0],
@@ -583,7 +656,8 @@ export default function App() {
             }
           }, 900);
         } else {
-          setNotification(`¡Daño recibido de ${attackerName}! -${damage} HP`);
+          const armorTag = totalRed > 0 ? ` (🛡️ -${Math.round(totalRed * 100)}% blindaje)` : '';
+          setNotification(`¡Daño recibido de ${attackerName}! -${effectiveDamage} HP${armorTag}`);
           setTimeout(() => setNotification(null), 2000);
         }
         return next;
@@ -664,6 +738,9 @@ export default function App() {
     let hudTimer = 0;
     let radarTimer = 0;
     const _listenerDir = new THREE.Vector3();
+    let activeMiningCoord: string | null = null;
+    let activeMiningProgress = 0;
+    let miningChipTimer = 0;
 
     function afterDraw(cb: () => void) {
       const gl = renderer.getContext() as WebGL2RenderingContext;
@@ -741,6 +818,20 @@ export default function App() {
               });
             }
           });
+
+          // Include tamed pets as friendly POIs on radar
+          combatRef.current.animals.forEach(({ data }) => {
+            if (data.isTamed) {
+              chestsList.push({
+                id: data.id,
+                name: data.name,
+                type: 'animal',
+                x: data.x,
+                z: data.z,
+              });
+            }
+          });
+
           setRadarData({
             playerX: p.x,
             playerY: p.y,
@@ -769,6 +860,51 @@ export default function App() {
         raycaster.setFromCamera(centerScreen, camera);
         const hit = voxelEngine.raycastBlock(raycaster);
         voxelEngine.updateTargetWireframes(hit);
+
+        // Progressive Minecraft-style Block Cracking while holding mine action / mouse down
+        const isMiningHeld =
+          (isMouseDown && toolModeRef.current === 'mine') || inputStateRef.current.mine;
+        if (isMiningHeld && hit && hit.blockId !== 'air') {
+          const coordKey = `${hit.hitCoord.x},${hit.hitCoord.y},${hit.hitCoord.z}`;
+          if (coordKey === activeMiningCoord) {
+            const hardness = voxelEngine.getBlockHardness(hit.blockId);
+            activeMiningProgress += dt / hardness;
+            miningChipTimer -= dt;
+            if (miningChipTimer <= 0) {
+              miningChipTimer = 0.16;
+              sound.playBlockChip(hit.blockId === 'wood' ? 'wood' : 'stone');
+              particleManager.spawnSparks(
+                hit.hitCoord.x + 0.5,
+                hit.hitCoord.y + 0.5,
+                hit.hitCoord.z + 0.5,
+                0xfee440,
+                5,
+                2.5
+              );
+            }
+            voxelEngine.setMiningCrack(
+              hit.hitCoord.x,
+              hit.hitCoord.y,
+              hit.hitCoord.z,
+              activeMiningProgress
+            );
+            if (activeMiningProgress >= 1.0) {
+              activeMiningCoord = null;
+              activeMiningProgress = 0;
+              voxelEngine.clearMiningCrack();
+              performMineAction();
+            }
+          } else {
+            activeMiningCoord = coordKey;
+            activeMiningProgress = 0;
+          }
+        } else {
+          if (activeMiningCoord !== null) {
+            activeMiningCoord = null;
+            activeMiningProgress = 0;
+            voxelEngine.clearMiningCrack();
+          }
+        }
 
         // Multiplayer peers simulation
         mpManager.update(dt);
@@ -900,6 +1036,11 @@ export default function App() {
       if (code === 'KeyE') {
         sound.playClick();
         setShowCraftingModal((prev) => !prev);
+      }
+
+      // Quick Eat Food shortcut (Tecla Q)
+      if (code === 'KeyQ') {
+        handleEatFood();
       }
 
       // Emotes shortcut
@@ -1370,6 +1511,7 @@ export default function App() {
           onTouchAction={handleTouchAction}
           materialInventory={materialInventory}
           onOpenCrafting={() => setShowCraftingModal(true)}
+          onEatFood={handleEatFood}
         />
       )}
 
@@ -1399,6 +1541,17 @@ export default function App() {
         }}
         weaponDamageMultiplier={weaponDamageMultiplier}
         onEarnPoints={addPoints}
+        onEquipArmor={(piece) => {
+          setAvatarCustom((prev) => {
+            const updated = {
+              ...prev,
+              armorHelmet: piece === 'helmet' ? true : prev.armorHelmet,
+              armorChestplate: piece === 'chestplate' ? true : prev.armorChestplate,
+            };
+            safeStorageSet('toroverse_avatar', JSON.stringify(updated));
+            return updated;
+          });
+        }}
         onSpawnNpcWave={handleSpawnNpcWave}
         onSpawnAnimalHerd={handleSpawnAnimalHerd}
       />

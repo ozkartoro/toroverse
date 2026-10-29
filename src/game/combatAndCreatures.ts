@@ -701,9 +701,11 @@ export class CombatAndCreaturesManager {
       const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), coatMat);
       head.position.set(0, 0.85, 0.5);
       const collar = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.42), collarMat);
+      collar.name = 'dogCollar';
       collar.position.set(0, 0.75, 0.38);
 
       const tail = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.4, 0.1), coatMat);
+      tail.name = 'dogTail';
       tail.position.set(0, 0.8, -0.5);
       tail.rotation.x = -0.5;
 
@@ -1220,6 +1222,10 @@ export class CombatAndCreaturesManager {
     dmg: number,
     attackerPos: THREE.Vector3
   ) {
+    if (data.isTamed) {
+      // Loyal companion cannot be damaged by its owner
+      return;
+    }
     data.hp -= dmg;
     sound.playPositionalEnemyHit(data.x, data.y + 0.8, data.z);
     this.triggerEnemyHitVisual(group);
@@ -1276,6 +1282,56 @@ export class CombatAndCreaturesManager {
         this.spawnAnimal(respawnType, rx, 2, rz);
       }
     }, 12000);
+  }
+
+  /**
+   * Find nearby wild untamed cyber dog to feed and tame
+   */
+  public getNearbyUntamedDog(pos: THREE.Vector3, maxDist: number = 4.5): AnimalEntity | null {
+    for (const { data } of this.animals.values()) {
+      if (data.type === 'cyber_dog' && !data.isTamed) {
+        const dist = Math.hypot(data.x - pos.x, data.z - pos.z);
+        if (dist <= maxDist && Math.abs(data.y - pos.y) < 3.0) {
+          return data;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Tame a Cyber-Dog so it becomes a loyal guardian escort that defends Victoria Toro!
+   */
+  public tameAnimal(animalId: string, ownerName: string = 'Victoria Toro'): boolean {
+    const animalObj = this.animals.get(animalId);
+    if (!animalObj || animalObj.data.type !== 'cyber_dog' || animalObj.data.isTamed) return false;
+
+    const { data, group, hpBar } = animalObj;
+    data.isTamed = true;
+    data.ownerName = ownerName;
+    data.name = `🐕 Lobo Guardián de ${ownerName}`;
+    data.maxHp = 140;
+    data.hp = 140;
+    data.speed = 4.2;
+
+    sound.playTame();
+    if (this.particleManager) {
+      this.particleManager.spawnMagic(data.x, data.y + 0.9, data.z, 0xf43f5e, 26, 4.2);
+      this.particleManager.spawnRing(data.x, data.y + 0.3, data.z, 0x00f5d4, 2.2);
+    }
+
+    // Glowing cyan collar for tamed dog
+    const collar = group.getObjectByName('dogCollar') as THREE.Mesh;
+    if (collar) {
+      collar.material = new THREE.MeshStandardMaterial({
+        color: 0x00f5d4,
+        emissive: 0x00f5d4,
+        emissiveIntensity: 1.6,
+      });
+    }
+
+    this.updateEnemyHealthBar(hpBar, data.hp, data.maxHp);
+    return true;
   }
 
   // Player performs an attack with current weapon
@@ -1840,28 +1896,111 @@ export class CombatAndCreaturesManager {
         this.creatureAudioTimers.set(data.id, aTimers);
       }
 
-      data.wanderTimer -= dt;
+      if (data.isTamed) {
+        // Tamed Wolf Guardian companion behavior:
+        const tail = group.getObjectByName('dogTail');
+        if (tail) {
+          tail.rotation.z = Math.sin(Date.now() * 0.012) * 0.45;
+        }
 
-      if (data.wanderTimer <= 0) {
-        data.wanderTimer = 3.0 + Math.random() * 4.0;
-        data.speed = 1.8; // Reset panic speed
-        data.targetX = data.x + (Math.random() - 0.5) * 16;
-        data.targetZ = data.z + (Math.random() - 0.5) * 16;
-      }
+        const distToPlayer = Math.hypot(playerPos.x - data.x, playerPos.z - data.z);
+        // Teleport if player moves way too far (e.g. portal or sprint)
+        if (distToPlayer > 35) {
+          data.x = playerPos.x + (Math.random() - 0.5) * 3;
+          data.z = playerPos.z + (Math.random() - 0.5) * 3;
+          data.targetX = data.x;
+          data.targetZ = data.z;
+          this.particleManager?.spawnMagic(data.x, data.y + 0.8, data.z, 0x00f5d4, 16, 2.5);
+        }
 
-      const dist = Math.hypot(data.targetX - data.x, data.targetZ - data.z);
-      if (dist > 0.2) {
-        const angle = Math.atan2(data.targetX - data.x, data.targetZ - data.z);
-        const animalSpeed = data.speed * this.weatherSpeedMultiplier;
-        data.x += Math.sin(angle) * animalSpeed * dt;
-        data.z += Math.cos(angle) * animalSpeed * dt;
-        data.rotationY = angle;
+        // Search for nearby hostile enemies to attack & protect player
+        let activeEnemy: EnemyEntity | null = null;
+        if (data.targetEnemyId) {
+          const eObj = this.enemies.get(data.targetEnemyId);
+          if (eObj && !eObj.data.isDead) {
+            activeEnemy = eObj.data;
+          } else {
+            data.targetEnemyId = null;
+          }
+        }
 
-        // Animal gentle footsteps
-        aTimers.stepTimer -= dt;
-        if (aTimers.stepTimer <= 0) {
-          aTimers.stepTimer = 0.46;
-          sound.playPositionalFootstep(data.x, data.y, data.z, 'grass', true);
+        if (!activeEnemy) {
+          let closestDist = 18.0;
+          this.enemies.forEach((eObj) => {
+            if (eObj.data.isDead) return;
+            const d = Math.hypot(eObj.data.x - data.x, eObj.data.z - data.z);
+            if (d < closestDist) {
+              closestDist = d;
+              activeEnemy = eObj.data;
+              data.targetEnemyId = eObj.data.id;
+            }
+          });
+        }
+
+        if (activeEnemy) {
+          // Sprint to hostile enemy and bite!
+          const angle = Math.atan2(activeEnemy.x - data.x, activeEnemy.z - data.z);
+          data.rotationY = angle;
+          const enemyDist = Math.hypot(activeEnemy.x - data.x, activeEnemy.z - data.z);
+          if (enemyDist > 1.45) {
+            data.x += Math.sin(angle) * 5.2 * dt;
+            data.z += Math.cos(angle) * 5.2 * dt;
+          } else {
+            // Bite attack
+            data.wanderTimer = (data.wanderTimer ?? 0) - dt;
+            if (data.wanderTimer <= 0) {
+              data.wanderTimer = 0.75;
+              const eObj = this.enemies.get(activeEnemy.id);
+              if (eObj && !eObj.data.isDead) {
+                const dmg = 26;
+                eObj.data.hp -= dmg;
+                sound.playPositionalEnemyHit(eObj.data.x, eObj.data.y + 1, eObj.data.z);
+                this.triggerEnemyHitVisual(eObj.group);
+                this.spawnDamageNumber(eObj.data.x, eObj.data.y + 1.8, eObj.data.z, dmg, false, false);
+                this.particleManager?.spawnSparks(eObj.data.x, eObj.data.y + 0.8, eObj.data.z, 0x00f5d4, 10, 4.0);
+                this.updateEnemyHealthBar(eObj.hpBar, eObj.data.hp, eObj.data.maxHp);
+                if (eObj.data.hp <= 0) {
+                  this.defeatEnemy(eObj.data.id);
+                  data.targetEnemyId = null;
+                }
+              }
+            }
+          }
+        } else {
+          // Escort player smoothly
+          if (distToPlayer > 3.2) {
+            const angle = Math.atan2(playerPos.x - data.x, playerPos.z - data.z);
+            data.rotationY = angle;
+            data.x += Math.sin(angle) * 3.8 * dt;
+            data.z += Math.cos(angle) * 3.8 * dt;
+          } else {
+            data.rotationY = Math.atan2(playerPos.x - data.x, playerPos.z - data.z);
+          }
+        }
+      } else {
+        data.wanderTimer -= dt;
+
+        if (data.wanderTimer <= 0) {
+          data.wanderTimer = 3.0 + Math.random() * 4.0;
+          data.speed = 1.8; // Reset panic speed
+          data.targetX = data.x + (Math.random() - 0.5) * 16;
+          data.targetZ = data.z + (Math.random() - 0.5) * 16;
+        }
+
+        const dist = Math.hypot(data.targetX - data.x, data.targetZ - data.z);
+        if (dist > 0.2) {
+          const angle = Math.atan2(data.targetX - data.x, data.targetZ - data.z);
+          const animalSpeed = data.speed * this.weatherSpeedMultiplier;
+          data.x += Math.sin(angle) * animalSpeed * dt;
+          data.z += Math.cos(angle) * animalSpeed * dt;
+          data.rotationY = angle;
+
+          // Animal gentle footsteps
+          aTimers.stepTimer -= dt;
+          if (aTimers.stepTimer <= 0) {
+            aTimers.stepTimer = 0.46;
+            sound.playPositionalFootstep(data.x, data.y, data.z, 'grass', true);
+          }
         }
       }
 

@@ -73,15 +73,22 @@ export const MiniMap: React.FC<MiniMapProps> = ({
 
   // Collapsed state (Defaults to collapsed on mobile / compact screens so it doesn't cover the 3D view)
   const [isMobileView, setIsMobileView] = useState<boolean>(() => {
-    return typeof window !== 'undefined' && (window.innerWidth < 1024 || window.innerHeight < 580);
+    return (
+      typeof window !== 'undefined' &&
+      (window.innerWidth < 1024 || window.innerHeight < 640 || 'ontouchstart' in window)
+    );
   });
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-    return typeof window !== 'undefined' && (window.innerWidth < 1024 || window.innerHeight < 580);
+    return (
+      typeof window !== 'undefined' &&
+      (window.innerWidth < 1024 || window.innerHeight < 640 || 'ontouchstart' in window)
+    );
   });
 
   useEffect(() => {
     const onResize = () => {
-      const mobile = window.innerWidth < 1024 || window.innerHeight < 580;
+      const mobile =
+        window.innerWidth < 1024 || window.innerHeight < 640 || 'ontouchstart' in window;
       setIsMobileView(mobile);
     };
     window.addEventListener('resize', onResize);
@@ -456,7 +463,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({
     setRotateWithPlayer((prev) => !prev);
   };
 
-  const radarSize = isMobileView ? 108 : 156;
+  const radarSize = isMobileView ? 82 : 156;
 
   return (
     <div className="pointer-events-auto flex flex-col items-end gap-1 select-none">
@@ -468,11 +475,11 @@ export const MiniMap: React.FC<MiniMapProps> = ({
             setIsCollapsed(false);
           }}
           title="Expandir Mini-Mapa Radar"
-          className="flex items-center gap-1.5 rounded-xl bg-slate-950/85 border border-cyan-500/40 px-2.5 py-1.5 shadow-lg backdrop-blur-md hover:border-cyan-400 transition cursor-pointer"
+          className="flex items-center gap-1.5 rounded-full bg-slate-950/90 border border-cyan-500/50 px-2.5 py-1 shadow-lg backdrop-blur-md hover:border-cyan-400 active:scale-95 transition cursor-pointer"
         >
-          <Crosshair className="h-3.5 w-3.5 text-cyan-400 animate-spin-slow flex-shrink-0" />
+          <Crosshair className="h-3 w-3 text-cyan-400 animate-spin-slow flex-shrink-0" />
           <span className="text-[10px] font-mono font-bold text-white">
-            Mapa ({Math.round(playerX)}, {Math.round(playerZ)})
+            Radar {Math.round(playerX)},{Math.round(playerZ)}
           </span>
           {stats.chestsInRange > 0 && (
             <span className="flex items-center gap-0.5 text-[10px] font-mono text-amber-300 font-bold">
@@ -488,12 +495,12 @@ export const MiniMap: React.FC<MiniMapProps> = ({
         </button>
       ) : (
         /* Expanded Mini-map Container */
-        <div className="relative rounded-2xl bg-slate-950/85 border border-cyan-500/35 p-1.5 sm:p-2 shadow-2xl backdrop-blur-md flex flex-col items-center">
+        <div className="relative rounded-2xl bg-slate-950/90 border border-cyan-500/40 p-1 sm:p-2 shadow-2xl backdrop-blur-md flex flex-col items-center max-w-[200px]">
           {/* Top Header: Island name & collapse/expand controls */}
-          <div className="w-full flex items-center justify-between gap-1.5 border-b border-slate-800/80 pb-1 mb-1 px-1">
+          <div className="w-full flex items-center justify-between gap-1 border-b border-slate-800/80 pb-0.5 mb-1 px-1">
             <div className="flex items-center gap-1 overflow-hidden">
               <Crosshair className="h-3 w-3 text-cyan-400 animate-spin-slow flex-shrink-0" />
-              <span className="text-[10px] sm:text-[11px] font-bold text-white truncate max-w-[75px] sm:max-w-[125px]">
+              <span className="text-[9px] sm:text-[11px] font-bold text-white truncate max-w-[65px] sm:max-w-[110px]">
                 {islandName.split(':')[0]}
               </span>
             </div>
@@ -503,7 +510,7 @@ export const MiniMap: React.FC<MiniMapProps> = ({
               <button
                 onClick={handleCycleZoom}
                 title={`Rango de radar: ${currentRadius}m (Clic para cambiar)`}
-                className="px-1 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-[9px] font-mono text-cyan-300 hover:text-white hover:bg-slate-800 transition"
+                className="px-1 py-0.5 rounded bg-slate-900 border border-slate-700/80 text-[8px] sm:text-[9px] font-mono text-cyan-300 hover:text-white hover:bg-slate-800 transition"
               >
                 {currentRadius}m
               </button>
@@ -527,8 +534,8 @@ export const MiniMap: React.FC<MiniMapProps> = ({
                   sound.playClick();
                   setIsCollapsed(true);
                 }}
-                title="Minimizar mini-mapa"
-                className="p-1 rounded bg-slate-900 border border-slate-700/80 text-slate-400 hover:text-white transition"
+                title="Minimizar radar"
+                className="p-1 rounded bg-rose-950/60 border border-rose-500/50 text-rose-300 hover:text-white transition flex items-center justify-center"
               >
                 <Minimize2 className="h-2.5 w-2.5" />
               </button>

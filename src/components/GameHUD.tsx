@@ -38,6 +38,7 @@ import {
   Package,
   Maximize2,
   Minimize2,
+  Utensils,
 } from 'lucide-react';
 import { BlockId, MaterialId, MaterialInventory, VoxelWorldData, WeaponId } from '../types/game';
 import { BLOCK_DEFINITIONS } from '../game/blockDefinitions';
@@ -102,6 +103,7 @@ interface GameHUDProps {
   // Material Inventory & Crafting
   materialInventory?: MaterialInventory;
   onOpenCrafting?: () => void;
+  onEatFood?: () => void;
 }
 
 const HOTBAR_BLOCKS: BlockId[] = [
@@ -167,6 +169,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
   onTouchAction,
   materialInventory,
   onOpenCrafting,
+  onEatFood,
 }) => {
   const [dockCollapsed, setDockCollapsed] = useState<boolean>(() => {
     return (
@@ -197,8 +200,10 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       const fsElement = doc.fullscreenElement || doc.webkitFullscreenElement;
       if (!fsElement && isFullscreen) {
         setIsFullscreen(false);
+        document.body.classList.remove('tv-pseudo-fullscreen');
       } else if (fsElement && !isFullscreen) {
         setIsFullscreen(true);
+        document.body.classList.add('tv-pseudo-fullscreen');
       }
     };
     document.addEventListener('fullscreenchange', handleFsChange);
@@ -218,6 +223,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
     if (!isFullscreen && !isCurrentlyNativeFs) {
       setIsFullscreen(true);
       setDockCollapsed(true);
+      document.body.classList.add('tv-pseudo-fullscreen');
       try {
         if (elem.requestFullscreen) {
           await elem.requestFullscreen();
@@ -229,6 +235,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
       }
     } else {
       setIsFullscreen(false);
+      document.body.classList.remove('tv-pseudo-fullscreen');
       try {
         if (doc.exitFullscreen && doc.fullscreenElement) {
           await doc.exitFullscreen();
@@ -673,14 +680,29 @@ export const GameHUD: React.FC<GameHUDProps> = ({
               </button>
             )}
 
-            {/* Story Quest Log Button */}
+            {/* Quick Eat Food Button */}
+            {onEatFood && (materialInventory?.neon_meat ?? 0) > 0 && (
+              <button
+                onClick={onEatFood}
+                title="Consumir Carne Neón [Q] (+28 HP)"
+                className="relative flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-gradient-to-r from-rose-950/90 to-amber-950/90 border border-rose-400/60 text-rose-200 hover:bg-rose-900/60 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm cursor-pointer animate-pulse"
+              >
+                <Utensils className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-400" />
+                <span>Comer</span>
+                <span className="rounded-md bg-rose-500/30 border border-rose-400/40 px-1 py-0.2 text-[9px] sm:text-[10px] font-mono font-black text-rose-100">
+                  x{materialInventory?.neon_meat}
+                </span>
+              </button>
+            )}
+
+            {/* Story Quest Log Button (Compact on desktop) */}
             {onOpenQuestLog && !isFullscreen && (
               <button
                 onClick={() => {
                   sound.playClick();
                   onOpenQuestLog();
                 }}
-                className="relative flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+                className="hidden md:flex relative items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
               >
                 <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
                 <span className="hidden md:inline">Diario [J]</span>
@@ -699,7 +721,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   sound.playClick();
                   onOpenWeeklyEvent();
                 }}
-                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-pink-500/40 text-pink-300 hover:bg-pink-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+                className="hidden md:flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-pink-500/40 text-pink-300 hover:bg-pink-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
               >
                 <Flame className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-pink-400 animate-pulse" />
                 <span className="hidden md:inline">Evento Neón</span>
@@ -713,7 +735,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   sound.playClick();
                   onOpenMarketplace();
                 }}
-                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+                className="hidden md:flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-amber-500/40 text-amber-300 hover:bg-amber-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
               >
                 <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400" />
                 <span className="hidden md:inline">Mercado</span>
@@ -727,7 +749,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   sound.playClick();
                   onOpenAvatar();
                 }}
-                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+                className="hidden md:flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
               >
                 <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="hidden md:inline">Avatar</span>
@@ -741,7 +763,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   sound.playClick();
                   onOpenWorldEditor();
                 }}
-                className="flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
+                className="hidden md:flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl bg-slate-950/85 border border-purple-500/40 text-purple-300 hover:bg-purple-950/40 text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm"
               >
                 <Globe className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 <span className="hidden md:inline">Islas</span>
@@ -755,7 +777,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                   sound.playClick();
                   onOpenEmotes();
                 }}
-                className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm ${
+                className={`hidden md:flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 rounded-xl text-[11px] sm:text-xs font-bold transition shadow-lg backdrop-blur-sm ${
                   activeEmote
                     ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border border-pink-300 shadow-pink-500/40 animate-pulse'
                     : 'bg-slate-950/85 border border-cyan-400/50 text-cyan-300 hover:bg-cyan-950/40'
@@ -834,126 +856,156 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         </div>
       )}
 
-      {/* Touch Controls Layer (Anchored safely inside the viewport so buttons are never cut off) */}
+      {/* Touch Controls Layer (Anchored safely above bottom bezel & safe-areas so buttons are NEVER cut off) */}
       {showTouchControls && (
         <div
-          className={`absolute left-2.5 right-2.5 sm:left-4 sm:right-4 pointer-events-none z-30 flex justify-between items-end transition-all ${
-            dockCollapsed ? 'bottom-9 sm:bottom-11' : 'bottom-32 sm:bottom-36'
-          }`}
+          className="fixed pointer-events-none z-30 flex justify-between items-end"
+          style={{
+            bottom: 'max(14px, calc(env(safe-area-inset-bottom) + 10px))',
+            left: 'max(14px, calc(env(safe-area-inset-left) + 8px))',
+            right: 'max(14px, calc(env(safe-area-inset-right) + 8px))',
+          }}
         >
-          {/* Left: Virtual Joystick */}
+          {/* Left: Ergonomic Virtual Joystick */}
           <div
             onTouchStart={handleTouchStartStick}
             onTouchMove={handleTouchMoveStick}
             onTouchEnd={handleTouchEndStick}
-            className="pointer-events-auto h-20 w-20 sm:h-26 sm:w-26 rounded-full bg-slate-900/70 border-2 border-cyan-500/45 relative flex items-center justify-center touch-none shadow-2xl backdrop-blur-sm ml-1"
+            className="pointer-events-auto h-20 w-20 rounded-full bg-slate-900/80 border-2 border-cyan-400/60 relative flex items-center justify-center touch-none shadow-2xl backdrop-blur-md"
           >
             <div
-              className="h-9 w-9 sm:h-11 sm:w-11 rounded-full bg-cyan-400/90 border-2 border-white shadow-lg transition-transform duration-75 flex items-center justify-center text-[8px] sm:text-[9px] font-mono font-bold text-slate-950"
+              className="h-10 w-10 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-500 border-2 border-white shadow-lg transition-transform duration-75 flex items-center justify-center text-[9px] font-mono font-black text-slate-950"
               style={{ transform: `translate(${stickPos.x * 0.8}px, ${stickPos.y * 0.8}px)` }}
             >
               MOVE
             </div>
           </div>
 
-          {/* Right: Ergonomic Action Pad (Never overflows or gets cut off) */}
-          <div className="pointer-events-auto flex flex-col items-end gap-1.5 sm:gap-2 mr-0.5">
-            {/* Top Row of Action Pad: Weapon Switch + Primary Attack */}
-            <div className="flex items-center gap-2">
+          {/* Right: Low-profile Ergonomic Action Cluster (Never cut off or hidden) */}
+          <div className="pointer-events-auto flex items-end gap-1.5 sm:gap-2">
+            {/* Quick Eat (if available) */}
+            {onEatFood && (materialInventory?.neon_meat ?? 0) > 0 && (
               <button
                 onTouchStart={(e) => {
                   e.preventDefault();
-                  const nextIdx = (WEAPONS_LIST.indexOf(equippedWeapon) + 1) % WEAPONS_LIST.length;
-                  onSelectWeapon(WEAPONS_LIST[nextIdx]);
-                  onSetToolMode('combat');
+                  onEatFood();
                 }}
-                onClick={() => {
-                  const nextIdx = (WEAPONS_LIST.indexOf(equippedWeapon) + 1) % WEAPONS_LIST.length;
-                  onSelectWeapon(WEAPONS_LIST[nextIdx]);
-                  onSetToolMode('combat');
-                }}
-                className="h-10 px-2.5 rounded-full bg-slate-900/85 border border-rose-500/50 text-rose-300 font-bold text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer backdrop-blur-sm"
+                onClick={() => onEatFood()}
+                title="Comer Carne Neón (+28 HP)"
+                className="h-11 w-11 rounded-full bg-gradient-to-tr from-amber-600 to-rose-600 text-white font-black text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer border border-amber-300 backdrop-blur-md"
               >
-                <span className="text-[8px] text-slate-400 font-mono">ARMA</span>
-                <span className="text-white font-extrabold">{WEAPON_DEFINITIONS[equippedWeapon].name.split(' ')[0]}</span>
+                <Utensils className="h-4 w-4" />
+                <span className="text-[7px] leading-tight font-black">COMER</span>
               </button>
+            )}
 
-              <button
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  onSetToolMode('combat');
+            {/* Weapon Switcher Button */}
+            <button
+              onTouchStart={(e) => {
+                e.preventDefault();
+                const nextIdx = (WEAPONS_LIST.indexOf(equippedWeapon) + 1) % WEAPONS_LIST.length;
+                onSelectWeapon(WEAPONS_LIST[nextIdx]);
+                onSetToolMode('combat');
+              }}
+              onClick={() => {
+                const nextIdx = (WEAPONS_LIST.indexOf(equippedWeapon) + 1) % WEAPONS_LIST.length;
+                onSelectWeapon(WEAPONS_LIST[nextIdx]);
+                onSetToolMode('combat');
+              }}
+              title="Cambiar Arma"
+              className="h-11 px-2.5 rounded-2xl bg-slate-900/90 border border-purple-500/60 text-purple-200 font-bold text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer backdrop-blur-md"
+            >
+              <span className="text-[7px] text-purple-400 font-mono">ARMA</span>
+              <span className="text-white font-black">{WEAPON_DEFINITIONS[equippedWeapon].name.split(' ')[0]}</span>
+            </button>
+
+            {/* Mode Switcher Button (Cycles: Combate -> Minar -> Construir) */}
+            <button
+              onTouchStart={(e) => {
+                e.preventDefault();
+                sound.playClick();
+                const modes: Array<'combat' | 'mine' | 'place'> = ['combat', 'mine', 'place'];
+                const nextMode = modes[(modes.indexOf(toolMode as any) + 1) % modes.length];
+                onSetToolMode(nextMode);
+              }}
+              onClick={() => {
+                sound.playClick();
+                const modes: Array<'combat' | 'mine' | 'place'> = ['combat', 'mine', 'place'];
+                const nextMode = modes[(modes.indexOf(toolMode as any) + 1) % modes.length];
+                onSetToolMode(nextMode);
+              }}
+              title="Cambiar Modo (Combate / Minar / Construir)"
+              className="h-11 px-2.5 rounded-2xl bg-slate-900/90 border border-cyan-500/60 text-cyan-200 font-bold text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer backdrop-blur-md"
+            >
+              <span className="text-[7px] text-cyan-400 font-mono">MODO</span>
+              <span className="text-white font-black">
+                {toolMode === 'combat' ? '⚔️ Combate' : toolMode === 'mine' ? '⛏️ Minar' : '🔨 Poner'}
+              </span>
+            </button>
+
+            {/* Jump Button */}
+            <button
+              onTouchStart={(e) => {
+                e.preventDefault();
+                onTouchJump();
+              }}
+              onClick={() => onTouchJump()}
+              title="Salto"
+              className="h-12 w-12 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-slate-950 font-black text-[10px] shadow-xl shadow-cyan-500/40 flex flex-col items-center justify-center active:scale-95 cursor-pointer border-2 border-white/70 backdrop-blur-md"
+            >
+              <span className="text-xs">⏫</span>
+              <span className="text-[8px] leading-tight font-black">SALTO</span>
+            </button>
+
+            {/* Primary Action Button (Dynamic: Attack / Mine / Place) */}
+            <button
+              onTouchStart={(e) => {
+                e.preventDefault();
+                if (toolMode === 'combat') {
                   onAttack();
-                }}
-                onClick={() => {
-                  onSetToolMode('combat');
+                } else {
+                  onTouchAction();
+                }
+              }}
+              onClick={() => {
+                if (toolMode === 'combat') {
                   onAttack();
-                }}
-                className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gradient-to-r from-rose-600 via-pink-600 to-rose-700 text-white font-black text-[10px] sm:text-xs shadow-xl shadow-rose-600/50 flex flex-col items-center justify-center active:scale-95 cursor-pointer border-2 border-rose-300"
-              >
-                <Sword className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span>ATACAR</span>
-              </button>
-            </div>
-
-            {/* Bottom Row of Action Pad: Jump + Mine + Place */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <button
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  onTouchJump();
-                }}
-                onClick={() => onTouchJump()}
-                className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 text-slate-950 font-black text-[9px] sm:text-[10px] shadow-xl shadow-cyan-500/40 flex items-center justify-center active:scale-95 cursor-pointer border border-white/60"
-              >
-                SALTO
-              </button>
-
-              <button
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  onSetToolMode('mine');
+                } else {
                   onTouchAction();
-                }}
-                onClick={() => {
-                  onSetToolMode('mine');
-                  onTouchAction();
-                }}
-                className={`h-10 w-10 sm:h-11 sm:w-11 rounded-full font-bold text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer border ${
-                  toolMode === 'mine'
-                    ? 'bg-amber-500 text-slate-950 border-white shadow-amber-500/40'
-                    : 'bg-slate-800/90 text-amber-300 border-amber-500/40'
-                }`}
-              >
-                <Pickaxe className="h-3.5 w-3.5" />
-                <span>MINAR</span>
-              </button>
-
-              <button
-                onTouchStart={(e) => {
-                  e.preventDefault();
-                  onSetToolMode('place');
-                  onTouchAction();
-                }}
-                onClick={() => {
-                  onSetToolMode('place');
-                  onTouchAction();
-                }}
-                className={`h-10 w-10 sm:h-11 sm:w-11 rounded-full font-bold text-[9px] shadow-lg flex flex-col items-center justify-center active:scale-95 cursor-pointer border ${
-                  toolMode === 'place'
-                    ? 'bg-emerald-500 text-slate-950 border-white shadow-emerald-500/40'
-                    : 'bg-emerald-700/90 text-white border-emerald-400/50'
-                }`}
-              >
-                <Hammer className="h-3.5 w-3.5" />
-                <span>PONER</span>
-              </button>
-            </div>
+                }
+              }}
+              title={toolMode === 'combat' ? 'Atacar' : toolMode === 'mine' ? 'Minar' : 'Poner Bloque'}
+              className={`h-14 w-14 rounded-full font-black text-[10px] shadow-2xl flex flex-col items-center justify-center active:scale-95 cursor-pointer border-2 transition-transform ${
+                toolMode === 'combat'
+                  ? 'bg-gradient-to-tr from-rose-600 to-pink-600 text-white border-rose-300 shadow-rose-600/50'
+                  : toolMode === 'mine'
+                  ? 'bg-gradient-to-tr from-amber-500 to-yellow-500 text-slate-950 border-amber-200 shadow-amber-500/50'
+                  : 'bg-gradient-to-tr from-emerald-500 to-teal-500 text-slate-950 border-emerald-200 shadow-emerald-500/50'
+              }`}
+            >
+              {toolMode === 'combat' ? (
+                <>
+                  <Sword className="h-5 w-5 mb-0.5" />
+                  <span className="text-[9px] leading-tight">ATACAR</span>
+                </>
+              ) : toolMode === 'mine' ? (
+                <>
+                  <Pickaxe className="h-5 w-5 mb-0.5" />
+                  <span className="text-[9px] leading-tight">MINAR</span>
+                </>
+              ) : (
+                <>
+                  <Hammer className="h-5 w-5 mb-0.5" />
+                  <span className="text-[9px] leading-tight">PONER</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}
 
-      {/* Unified Bottom Control Dock (Consolidated, Zero-occlusion, Collapsible) */}
-      <div className="pointer-events-auto mx-auto w-full max-w-4xl flex flex-col items-center mt-auto z-20">
+      {/* Unified Bottom Control Dock (Consolidated, Zero-occlusion, Collapsible on Desktop) */}
+      <div className={`pointer-events-auto mx-auto w-full max-w-4xl flex flex-col items-center mt-auto z-20 ${showTouchControls ? 'hidden sm:flex' : 'flex'}`}>
         {/* Collapse / Expand Tab Button */}
         <button
           onClick={() => {

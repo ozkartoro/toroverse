@@ -40,6 +40,17 @@ export class VoxelEngine {
   public targetBoxWireframe: THREE.LineSegments;
   public placeBoxWireframe: THREE.LineSegments;
 
+  // 3D Block Mining Cracks
+  private crackCanvas: HTMLCanvasElement;
+  private crackCtx: CanvasRenderingContext2D | null;
+  private crackTexture: THREE.CanvasTexture;
+  public crackMesh: THREE.Mesh;
+  private currentCrackStage: number = -1;
+
+  // Torch & Light Block Dynamic Illumination
+  private torchLightsGroup: THREE.Group;
+  private torchLights: THREE.PointLight[] = [];
+
   // Temporary matrix for instancing updates
   private _tempMat4 = new THREE.Matrix4();
 
@@ -53,6 +64,10 @@ export class VoxelEngine {
     this.particlesGroup = new THREE.Group();
     this.particlesGroup.name = 'Particles';
     this.scene.add(this.particlesGroup);
+
+    this.torchLightsGroup = new THREE.Group();
+    this.torchLightsGroup.name = 'TorchLights';
+    this.scene.add(this.torchLightsGroup);
 
     // Wireframes for targeting
     const targetWireGeo = new THREE.WireframeGeometry(this.boxGeometry);
@@ -70,6 +85,28 @@ export class VoxelEngine {
     );
     this.placeBoxWireframe.visible = false;
     this.scene.add(this.placeBoxWireframe);
+
+    // 3D Minecraft-style Block Cracking Overlay Mesh
+    this.crackCanvas = document.createElement('canvas');
+    this.crackCanvas.width = 128;
+    this.crackCanvas.height = 128;
+    this.crackCtx = this.crackCanvas.getContext('2d');
+    this.crackTexture = new THREE.CanvasTexture(this.crackCanvas);
+    this.crackTexture.magFilter = THREE.NearestFilter;
+    this.crackTexture.minFilter = THREE.NearestFilter;
+
+    const crackMat = new THREE.MeshBasicMaterial({
+      map: this.crackTexture,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
+    this.crackMesh = new THREE.Mesh(new THREE.BoxGeometry(1.004, 1.004, 1.004), crackMat);
+    this.crackMesh.visible = false;
+    this.scene.add(this.crackMesh);
 
     this.buildWorld();
   }
@@ -129,6 +166,24 @@ export class VoxelEngine {
       this.worldGroup.add(instancedMesh);
       this.instancedMeshes.set(blockId, instancedMesh);
     });
+
+    // 3. Torch & Light Block Point Lights (Dynamic real-time illumination)
+    while (this.torchLights.length > 0) {
+      const l = this.torchLights.pop();
+      if (l) {
+        this.torchLightsGroup.remove(l);
+        l.dispose();
+      }
+    }
+    const torchCoords = groups.get('light_block') || [];
+    const maxLights = Math.min(18, torchCoords.length);
+    for (let i = 0; i < maxLights; i++) {
+      const c = torchCoords[i];
+      const light = new THREE.PointLight(0xffb703, 3.2, 16, 1.8);
+      light.position.set(c.x + 0.5, c.y + 1.2, c.z + 0.5);
+      this.torchLightsGroup.add(light);
+      this.torchLights.push(light);
+    }
   }
 
   public setBlock(x: number, y: number, z: number, blockId: BlockId): boolean {
@@ -223,6 +278,98 @@ export class VoxelEngine {
       hitResult.placeCoord.y + 0.5,
       hitResult.placeCoord.z + 0.5
     );
+  }
+
+  /**
+   * Block mining hardness in seconds to break
+   */
+  public getBlockHardness(blockId: BlockId): number {
+    switch (blockId) {
+      case 'leaves':
+        return 0.18;
+      case 'dirt':
+      case 'grass':
+        return 0.38;
+      case 'wood':
+        return 0.62;
+      case 'stone':
+      case 'void_rock':
+        return 0.88;
+      case 'crystal_gold':
+      case 'quantum_tech':
+        return 1.15;
+      case 'neon_cyan':
+      case 'neon_magenta':
+        return 0.75;
+      default:
+        return 0.55;
+    }
+  }
+
+  /**
+   * Updates Minecraft-style progressive cracking visual stages (0 to 5) on the targeted block
+   */
+  public setMiningCrack(x: number, y: number, z: number, progress: number) {
+    if (progress <= 0 || progress >= 1.0) {
+      this.clearMiningCrack();
+      return;
+    }
+
+    this.crackMesh.position.set(x + 0.5, y + 0.5, z + 0.5);
+    this.crackMesh.visible = true;
+
+    const stage = Math.min(5, Math.floor(progress * 6));
+    if (stage !== this.currentCrackStage && this.crackCtx) {
+      this.currentCrackStage = stage;
+      this.drawProceduralCrackTexture(stage);
+      this.crackTexture.needsUpdate = true;
+    }
+  }
+
+  public clearMiningCrack() {
+    this.crackMesh.visible = false;
+    this.currentCrackStage = -1;
+  }
+
+  private drawProceduralCrackTexture(stage: number) {
+    if (!this.crackCtx) return;
+    const ctx = this.crackCtx;
+    ctx.clearRect(0, 0, 128, 128);
+
+    ctx.strokeStyle = '#020617';
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const cx = 64;
+    const cy = 64;
+
+    // Procedural jagged cracks radiating outward based on mining stage (1 to 5)
+    const branches = 4 + stage * 2;
+    for (let i = 0; i < branches; i++) {
+      const baseAngle = (i / branches) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+
+      let curX = cx;
+      let curY = cy;
+      const steps = 3 + stage;
+      const stepLen = (10 + stage * 6) / steps;
+
+      for (let s = 0; s < steps; s++) {
+        const jitter = (Math.sin(i * 13 + s * 7) * 0.5);
+        const a = baseAngle + jitter;
+        curX += Math.cos(a) * stepLen;
+        curY += Math.sin(a) * stepLen;
+        ctx.lineTo(curX, curY);
+      }
+      ctx.stroke();
+    }
+
+    // Outer subtle highlight on cracks
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
   }
 
   public spawnBlockDebris(wx: number, wy: number, wz: number, blockId: BlockId) {
