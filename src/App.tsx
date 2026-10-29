@@ -206,16 +206,18 @@ export default function App() {
     playerZ: number;
     playerYaw: number;
     enemies: MinimapEnemy[];
+    chests: MinimapPOI[];
   }>({
     playerX: 0,
     playerY: 0,
     playerZ: 0,
     playerYaw: 0,
     enemies: [],
+    chests: [],
   });
 
-  // Calculate island POIs (Spawn point, Central Citadel, pads, faros, scripts)
-  const minimapPois = useMemo(() => {
+  // Calculate island POIs (Spawn point, Central Citadel, pads, faros, scripts + live unopened chests)
+  const staticMinimapPois = useMemo(() => {
     const list: MinimapPOI[] = [
       {
         id: 'poi_spawn',
@@ -255,6 +257,11 @@ export default function App() {
 
     return list;
   }, [activeWorld]);
+
+  const minimapPois = useMemo(
+    () => [...staticMinimapPois, ...radarData.chests],
+    [staticMinimapPois, radarData.chests]
+  );
 
   // Touch & Input state
   const [isMobileTouch, setIsMobileTouch] = useState(false);
@@ -608,7 +615,17 @@ export default function App() {
       setTimeout(() => setNotification(null), 2400);
     };
 
-    // Spawn creatures for the active world
+    // Callback when a 3D Treasure Chest is opened
+    combatManager.onChestOpened = (chest, lootSummary, rewardPoints, healHp) => {
+      setHealth((prev) => Math.min(maxHealth, prev + healHp));
+      const zoneInfo = chest.zoneLabel ? ` (${chest.zoneLabel})` : '';
+      addPoints(
+        rewardPoints,
+        `${chest.name}${zoneInfo} abierto · +${healHp} HP · ${lootSummary}`
+      );
+    };
+
+    // Spawn creatures & treasure chests for the active world
     const spawnWorldEntities = (worldId: string) => {
       const spawns = WORLD_SPAWN_CREATURES[worldId] || WORLD_SPAWN_CREATURES['isla_nexo'];
       if (!spawns) return;
@@ -621,6 +638,11 @@ export default function App() {
       // Spawn peaceful voxel animals
       spawns.animals.forEach((an) => {
         combatManager.spawnAnimal(an.type, an.x, an.y, an.z);
+      });
+
+      // Spawn 3D treasure chests with items across different regions
+      spawns.chests.forEach((ch) => {
+        combatManager.spawnChest(ch.rarity, ch.x, ch.y, ch.z, ch.zoneLabel);
       });
     };
 
@@ -707,12 +729,25 @@ export default function App() {
               });
             }
           });
+          const chestsList: MinimapPOI[] = [];
+          combatRef.current.chests.forEach(({ data }) => {
+            if (!data.isOpen) {
+              chestsList.push({
+                id: data.id,
+                name: data.zoneLabel ? `${data.name} (${data.zoneLabel})` : data.name,
+                type: 'chest',
+                x: data.x,
+                z: data.z,
+              });
+            }
+          });
           setRadarData({
             playerX: p.x,
             playerY: p.y,
             playerZ: p.z,
             playerYaw: playerCtrlRef.current.yaw,
             enemies: enemiesList,
+            chests: chestsList,
           });
         }
       }
@@ -1046,6 +1081,9 @@ export default function App() {
         });
         spawns.animals.forEach((an) => {
           combatRef.current?.spawnAnimal(an.type, an.x, an.y, an.z);
+        });
+        spawns.chests.forEach((ch) => {
+          combatRef.current?.spawnChest(ch.rarity, ch.x, ch.y, ch.z, ch.zoneLabel);
         });
       }
     }

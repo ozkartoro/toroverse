@@ -11,6 +11,7 @@ import {
   CraftingRecipe,
   AnimalType,
   EnemyType,
+  ChestRarity,
 } from '../types/game';
 
 export const MATERIAL_DEFINITIONS: Record<MaterialId, MaterialDefinition> = {
@@ -314,6 +315,74 @@ export function getEnemyDrops(enemyType: EnemyType): Array<{ materialId: Materia
         { materialId: 'quantum_wool', count: 2 },
       ];
   }
+}
+
+// Generate randomized loot bundle when opening a 3D Treasure Chest
+export function getChestLoot(rarity: ChestRarity): {
+  drops: Array<{ materialId: MaterialId; count: number }>;
+  rewardPoints: number;
+  healHp: number;
+} {
+  const pickRandom = <T,>(pool: T[], count: number): T[] => {
+    const copy = [...pool];
+    const picked: T[] = [];
+    while (picked.length < count && copy.length > 0) {
+      const idx = Math.floor(Math.random() * copy.length);
+      picked.push(copy.splice(idx, 1)[0]);
+    }
+    return picked;
+  };
+
+  if (rarity === 'legendario') {
+    const pool: Array<{ materialId: MaterialId; count: number }> = [
+      { materialId: 'dark_alloy', count: 4 },
+      { materialId: 'plasma_cell', count: 4 },
+      { materialId: 'glitch_essence', count: 4 },
+      { materialId: 'teleport_pad', count: 2 },
+      { materialId: 'crystal_gold', count: 5 },
+      { materialId: 'quantum_tech', count: 4 },
+      { materialId: 'jump_pad', count: 2 },
+    ];
+    return {
+      drops: pickRandom(pool, 4),
+      rewardPoints: 650,
+      healHp: 45,
+    };
+  }
+
+  if (rarity === 'raro') {
+    const pool: Array<{ materialId: MaterialId; count: number }> = [
+      { materialId: 'crystal_gold', count: 3 },
+      { materialId: 'quantum_tech', count: 3 },
+      { materialId: 'cyber_leather', count: 3 },
+      { materialId: 'glitch_essence', count: 2 },
+      { materialId: 'plasma_cell', count: 2 },
+      { materialId: 'jump_pad', count: 1 },
+      { materialId: 'light_block', count: 2 },
+      { materialId: 'neon_magenta', count: 3 },
+    ];
+    return {
+      drops: pickRandom(pool, 3),
+      rewardPoints: 320,
+      healHp: 25,
+    };
+  }
+
+  // 'comun'
+  const pool: Array<{ materialId: MaterialId; count: number }> = [
+    { materialId: 'wood', count: 5 },
+    { materialId: 'stone', count: 5 },
+    { materialId: 'neon_cyan', count: 3 },
+    { materialId: 'quantum_wool', count: 3 },
+    { materialId: 'neon_meat', count: 3 },
+    { materialId: 'photon_feather', count: 2 },
+    { materialId: 'leaves', count: 4 },
+  ];
+  return {
+    drops: pickRandom(pool, 3),
+    rewardPoints: 150,
+    healHp: 15,
+  };
 }
 
 export const CRAFTING_RECIPES: CraftingRecipe[] = [

@@ -12,6 +12,8 @@ import {
   AnimalEntity,
   AnimalType,
   MaterialId,
+  ChestRarity,
+  ChestEntity,
 } from '../types/game';
 import { VoxelEngine } from './voxelEngine';
 import { sound } from '../audio/soundSystem';
@@ -20,6 +22,7 @@ import {
   MATERIAL_DEFINITIONS,
   getAnimalDrops,
   getEnemyDrops,
+  getChestLoot,
 } from '../data/materialsAndCrafting';
 
 export const WEAPON_DEFINITIONS: Record<WeaponId, WeaponDefinition> = {
@@ -104,6 +107,17 @@ export class CombatAndCreaturesManager {
 
   public enemies: Map<string, { data: EnemyEntity; group: THREE.Group; hpBar: THREE.Sprite }> = new Map();
   public animals: Map<string, { data: AnimalEntity; group: THREE.Group; hpBar: THREE.Sprite }> = new Map();
+  public chests: Map<
+    string,
+    {
+      data: ChestEntity;
+      group: THREE.Group;
+      lidPivot: THREE.Group;
+      beacon: THREE.Mesh;
+      ring: THREE.Mesh;
+      label: THREE.Sprite;
+    }
+  > = new Map();
   public projectiles: Projectile[] = [];
   public floatingTexts: FloatingText[] = [];
   public droppedItems: DroppedItem[] = [];
@@ -124,6 +138,12 @@ export class CombatAndCreaturesManager {
   public onEnemyDefeated?: (enemy: EnemyEntity, rewardPoints: number) => void;
   public onAnimalHarvested?: (animal: AnimalEntity, rewardPoints: number) => void;
   public onMaterialCollected?: (materialId: MaterialId, count: number) => void;
+  public onChestOpened?: (
+    chest: ChestEntity,
+    lootSummary: string,
+    rewardPoints: number,
+    healHp: number
+  ) => void;
 
   constructor(scene: THREE.Scene, voxelEngine: VoxelEngine, rightArm?: THREE.Group) {
     this.scene = scene;
@@ -178,6 +198,11 @@ export class CombatAndCreaturesManager {
       this.scene.remove(animalObj.group);
     });
     this.animals.clear();
+
+    this.chests.forEach((chestObj) => {
+      this.scene.remove(chestObj.group);
+    });
+    this.chests.clear();
 
     this.projectiles.forEach((p) => {
       this.scene.remove(p.mesh);
@@ -715,6 +740,293 @@ export class CombatAndCreaturesManager {
     return g;
   }
 
+  // ========================================================
+  // 3D TREASURE CHESTS (Cofres de Suministros, Cuánticos e Imperiales)
+  // ========================================================
+  public spawnChest(
+    rarity: ChestRarity,
+    x: number,
+    yHint: number,
+    z: number,
+    zoneLabel?: string
+  ): ChestEntity {
+    const id = `chest_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const nameMap: Record<ChestRarity, string> = {
+      comun: '🎁 Cofre de Suministros',
+      raro: '💎 Cofre Cuántico',
+      legendario: '👑 Cofre Imperial',
+    };
+
+    // Snap chest cleanly onto solid terrain near yHint
+    const bx = Math.floor(x);
+    const bz = Math.floor(z);
+    let groundY = yHint;
+    let found = false;
+    for (let y = Math.min(45, Math.ceil(yHint + 8)); y >= -10; y--) {
+      if (this.voxelEngine.hasSolidBlock(bx, y, bz)) {
+        groundY = y + 1;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      groundY = Math.max(1, yHint);
+    }
+
+    const data: ChestEntity = {
+      id,
+      rarity,
+      name: nameMap[rarity],
+      zoneLabel,
+      x,
+      y: groundY,
+      z,
+      isOpen: false,
+      respawnTimer: 0,
+    };
+
+    const { group, lidPivot, beacon, ring } = this.buildChestMesh(rarity);
+    group.position.set(x, groundY, z);
+    group.rotation.y = Math.atan2(-x, -z); // Face gently toward center / paths
+    this.scene.add(group);
+
+    const label = this.createChestLabelSprite(data.name, rarity, false);
+    label.position.set(0, 1.85, 0);
+    group.add(label);
+
+    this.chests.set(id, { data, group, lidPivot, beacon, ring, label });
+    return data;
+  }
+
+  private buildChestMesh(rarity: ChestRarity): {
+    group: THREE.Group;
+    lidPivot: THREE.Group;
+    beacon: THREE.Mesh;
+    ring: THREE.Mesh;
+  } {
+    const g = new THREE.Group();
+
+    const bodyColor =
+      rarity === 'legendario' ? 0x3b0764 : rarity === 'raro' ? 0x0f172a : 0x78350f;
+    const trimColor =
+      rarity === 'legendario' ? 0xfbbf24 : rarity === 'raro' ? 0x00f5d4 : 0x94a3b8;
+    const glowColor =
+      rarity === 'legendario' ? 0xf72585 : rarity === 'raro' ? 0x38bdf8 : 0xfee440;
+
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: bodyColor,
+      roughness: rarity === 'comun' ? 0.72 : 0.35,
+      metalness: rarity === 'comun' ? 0.2 : 0.65,
+    });
+    const trimMat = new THREE.MeshStandardMaterial({
+      color: trimColor,
+      emissive: rarity === 'comun' ? 0x000000 : trimColor,
+      emissiveIntensity: rarity === 'legendario' ? 0.65 : rarity === 'raro' ? 0.45 : 0,
+      roughness: 0.25,
+      metalness: 0.85,
+    });
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: glowColor,
+    });
+
+    // Chest Base Box
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.56, 0.78), bodyMat);
+    base.position.y = 0.28;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    g.add(base);
+
+    // Metallic Corner Bands on Base
+    const bandLeft = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.58, 0.82), trimMat);
+    bandLeft.position.set(-0.36, 0.28, 0);
+    const bandRight = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.58, 0.82), trimMat);
+    bandRight.position.set(0.36, 0.28, 0);
+    g.add(bandLeft, bandRight);
+
+    // Glowing Treasure Core inside Chest (revealed when lid opens!)
+    const innerTreasure = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.16, 0.56), coreMat);
+    innerTreasure.position.set(0, 0.52, 0);
+    g.add(innerTreasure);
+
+    // Hinged Lid Pivot at back edge (y = 0.56, z = -0.39)
+    const lidPivot = new THREE.Group();
+    lidPivot.position.set(0, 0.56, -0.39);
+
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.07, 0.32, 0.8), bodyMat);
+    lid.position.set(0, 0.16, 0.39);
+    lid.castShadow = true;
+    lidPivot.add(lid);
+
+    const lidBandLeft = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.35, 0.83), trimMat);
+    lidBandLeft.position.set(-0.36, 0.16, 0.39);
+    const lidBandRight = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.35, 0.83), trimMat);
+    lidBandRight.position.set(0.36, 0.16, 0.39);
+    lidPivot.add(lidBandLeft, lidBandRight);
+
+    // Glowing Front Clasp / Lock
+    const clasp = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.26, 0.1), coreMat);
+    clasp.position.set(0, 0.04, 0.81);
+    lidPivot.add(clasp);
+
+    if (rarity === 'legendario') {
+      const crown = new THREE.Mesh(new THREE.OctahedronGeometry(0.18, 0), trimMat);
+      crown.position.set(0, 0.44, 0.39);
+      lidPivot.add(crown);
+    }
+
+    g.add(lidPivot);
+
+    // Vertical Light Beacon Column so players can spot chests across the vast terrain
+    const beaconHeight = rarity === 'legendario' ? 12 : rarity === 'raro' ? 7.5 : 4.2;
+    const beaconMat = new THREE.MeshBasicMaterial({
+      color: glowColor,
+      transparent: true,
+      opacity: rarity === 'legendario' ? 0.26 : 0.16,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const beacon = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.35, beaconHeight, 8, 1, true),
+      beaconMat
+    );
+    beacon.position.y = beaconHeight / 2 + 0.5;
+    g.add(beacon);
+
+    // Floating Rotating Halo Ring at base
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: trimColor,
+      transparent: true,
+      opacity: 0.65,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+    });
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.72, 0.88, 20), ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.06;
+    g.add(ring);
+
+    return { group: g, lidPivot, beacon, ring };
+  }
+
+  private createChestLabelSprite(
+    title: string,
+    rarity: ChestRarity,
+    isOpen: boolean
+  ): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 56;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      this.drawChestLabelCanvas(ctx, title, rarity, isOpen);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false }));
+    sprite.scale.set(2.35, 0.52, 1);
+    return sprite;
+  }
+
+  private drawChestLabelCanvas(
+    ctx: CanvasRenderingContext2D,
+    title: string,
+    rarity: ChestRarity,
+    isOpen: boolean
+  ) {
+    ctx.clearRect(0, 0, 256, 56);
+    const borderCol = isOpen
+      ? '#475569'
+      : rarity === 'legendario'
+      ? '#fbbf24'
+      : rarity === 'raro'
+      ? '#00f5d4'
+      : '#fde047';
+
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.86)';
+    ctx.roundRect(8, 6, 240, 44, 10);
+    ctx.fill();
+    ctx.strokeStyle = borderCol;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = isOpen ? '#94a3b8' : '#ffffff';
+    ctx.fillText(isOpen ? '✨ Cofre Abierto' : title, 128, 25);
+
+    ctx.font = 'bold 11px monospace';
+    ctx.fillStyle = isOpen ? '#64748b' : borderCol;
+    ctx.fillText(
+      isOpen ? 'Recargando botín...' : 'Acércate o golpea para abrir',
+      128,
+      42
+    );
+  }
+
+  private updateChestLabelSprite(
+    sprite: THREE.Sprite,
+    title: string,
+    rarity: ChestRarity,
+    isOpen: boolean
+  ) {
+    const canvas = (sprite.material as THREE.SpriteMaterial).map?.image as HTMLCanvasElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      this.drawChestLabelCanvas(ctx, title, rarity, isOpen);
+      (sprite.material as THREE.SpriteMaterial).map!.needsUpdate = true;
+    }
+  }
+
+  public openChest(chestId: string): boolean {
+    const chestObj = this.chests.get(chestId);
+    if (!chestObj || chestObj.data.isOpen) return false;
+
+    const { data, group, beacon, ring, label } = chestObj;
+    data.isOpen = true;
+    data.respawnTimer = 45; // Recharges after 45 seconds
+
+    // Sound & Visual Celebration
+    if (data.rarity === 'legendario') {
+      sound.playFanfare();
+    } else {
+      sound.playPointCollect();
+    }
+
+    const fxColor =
+      data.rarity === 'legendario' ? 0xfbbf24 : data.rarity === 'raro' ? 0x00f5d4 : 0xfee440;
+    if (this.particleManager) {
+      this.particleManager.spawnMagic(data.x, data.y + 0.9, data.z, fxColor, 28, 5.5);
+      this.particleManager.spawnRing(data.x, data.y + 0.3, data.z, fxColor, 3.2);
+      this.particleManager.spawnSparks(data.x, data.y + 0.8, data.z, 0xffffff, 18, 6.0);
+    } else {
+      this.voxelEngine.spawnCelebrationParticles(data.x, data.y + 1.0, data.z);
+    }
+
+    // Pop jolt on chest group
+    group.scale.set(1.22, 1.22, 1.22);
+    beacon.visible = false;
+    ring.visible = false;
+    this.updateChestLabelSprite(label, data.name, data.rarity, true);
+
+    // Generate & Fountain 3D Loot Drops around the chest
+    const loot = getChestLoot(data.rarity);
+    const summaryParts: string[] = [];
+    loot.drops.forEach((drop) => {
+      this.spawnDroppedMaterial(data.x, data.y + 0.35, data.z, drop.materialId, drop.count);
+      const def = MATERIAL_DEFINITIONS[drop.materialId];
+      if (def) {
+        summaryParts.push(`+${drop.count} ${def.emoji}`);
+      }
+    });
+
+    if (this.onChestOpened) {
+      this.onChestOpened(data, summaryParts.join(' '), loot.rewardPoints, loot.healHp);
+    }
+
+    return true;
+  }
+
   // Create floating health bar + name label over enemy or animal
   private createFloatingHealthBar(hp: number, maxHp: number, labelName?: string): THREE.Sprite {
     const canvas = document.createElement('canvas');
@@ -886,6 +1198,18 @@ export class CombatAndCreaturesManager {
       }
     });
 
+    // Check treasure chests (mining a chest opens it!)
+    this.chests.forEach((chestObj) => {
+      const { data } = chestObj;
+      if (data.isOpen) return;
+      const dist = Math.hypot(data.x - playerPos.x, data.z - playerPos.z);
+      if (dist <= range + 0.5 && Math.abs(data.y - playerPos.y) < 3.2) {
+        if (this.openChest(data.id)) {
+          hitSomething = true;
+        }
+      }
+    });
+
     return hitSomething;
   }
 
@@ -1054,6 +1378,18 @@ export class CombatAndCreaturesManager {
           hitCount++;
           totalDmg += dmg;
           this.damageAnimal(data, group, hpBar, dmg, playerPos);
+        }
+      });
+
+      // Also check unopened treasure chests within melee reach
+      this.chests.forEach((chestObj) => {
+        const { data } = chestObj;
+        if (data.isOpen) return;
+        const dist = Math.hypot(data.x - playerPos.x, data.z - playerPos.z);
+        if (dist <= weapon.range + 0.4 && Math.abs(data.y - playerPos.y) < 3.2) {
+          if (this.openChest(data.id)) {
+            hitCount++;
+          }
         }
       });
     } else {
@@ -1270,6 +1606,20 @@ export class CombatAndCreaturesManager {
           if (dist < 1.45) {
             hit = true;
             this.damageAnimal(data, group, hpBar, p.damage, playerPos);
+          }
+        });
+      }
+
+      // Check collision with treasure chests (shoot chest to burst it open!)
+      if (!hit) {
+        this.chests.forEach((chestObj) => {
+          if (hit) return;
+          const { data } = chestObj;
+          if (data.isOpen) return;
+          const dist = p.mesh.position.distanceTo(new THREE.Vector3(data.x, data.y + 0.5, data.z));
+          if (dist < 1.55) {
+            hit = true;
+            this.openChest(data.id);
           }
         });
       }
@@ -1536,6 +1886,45 @@ export class CombatAndCreaturesManager {
 
       group.position.set(data.x, data.y, data.z);
       group.rotation.y = data.rotationY;
+    });
+
+    // 4.5 Update 3D Treasure Chests (Proximity auto-open, lid hinge animation & recharge)
+    const nowTime = Date.now() * 0.003;
+    this.chests.forEach((chestObj) => {
+      const { data, group, lidPivot, beacon, ring, label } = chestObj;
+
+      // Smoothly recover chest pop jolt scale
+      group.scale.x = THREE.MathUtils.damp(group.scale.x, 1.0, 10, dt);
+      group.scale.y = THREE.MathUtils.damp(group.scale.y, 1.0, 10, dt);
+      group.scale.z = THREE.MathUtils.damp(group.scale.z, 1.0, 10, dt);
+
+      // Smooth lid swing (-1.32 rad open vs 0 closed)
+      const targetLidRot = data.isOpen ? -1.32 : 0;
+      lidPivot.rotation.x = THREE.MathUtils.damp(lidPivot.rotation.x, targetLidRot, 9, dt);
+
+      if (!data.isOpen) {
+        // Shimmering halo ring & gentle floating label
+        ring.rotation.z += dt * 1.6;
+        const pulse = 1.0 + Math.sin(nowTime + data.x * 0.2) * 0.12;
+        ring.scale.set(pulse, pulse, 1);
+        label.position.y = 1.85 + Math.sin(nowTime * 1.4 + data.z * 0.3) * 0.08;
+
+        // Auto-open when player walks right up to the chest!
+        const dist = Math.hypot(data.x - playerPos.x, data.z - playerPos.z);
+        if (dist < 2.55 && Math.abs(data.y - playerPos.y) < 2.6) {
+          this.openChest(data.id);
+        }
+      } else {
+        // Recharge timer so explored chests refill after 45s
+        data.respawnTimer -= dt;
+        if (data.respawnTimer <= 0) {
+          data.isOpen = false;
+          beacon.visible = true;
+          ring.visible = true;
+          this.updateChestLabelSprite(label, data.name, data.rarity, false);
+          this.particleManager?.spawnMagic(data.x, data.y + 0.8, data.z, 0x00f5d4, 14, 3.5);
+        }
+      }
     });
 
     // 5. Only update world-space weapon position if not parented to character arm

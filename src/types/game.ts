@@ -106,6 +106,20 @@ export interface EnemyEntity {
 
 export type AnimalType = 'quantum_sheep' | 'cyber_dog' | 'neon_pig' | 'holo_bird';
 
+export type ChestRarity = 'comun' | 'raro' | 'legendario';
+
+export interface ChestEntity {
+  id: string;
+  rarity: ChestRarity;
+  name: string;
+  zoneLabel?: string;
+  x: number;
+  y: number;
+  z: number;
+  isOpen: boolean;
+  respawnTimer: number;
+}
+
 export interface AnimalEntity {
   id: string;
   type: AnimalType;

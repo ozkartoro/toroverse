@@ -3,17 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { BlockId, VoxelWorldData, EnemyType, AnimalType } from '../types/game';
+import { BlockId, VoxelWorldData, EnemyType, AnimalType, ChestRarity } from '../types/game';
 
 // Helper to set block
 function setB(blocks: Record<string, BlockId>, x: number, y: number, z: number, id: BlockId) {
   blocks[`${x},${y},${z}`] = id;
 }
 
-// Spawns definition for creatures on each world
+// Spawns definition for creatures & treasure chests on each world
 export interface WorldCreatureSpawns {
   enemies: Array<{ type: EnemyType; x: number; y: number; z: number }>;
   animals: Array<{ type: AnimalType; x: number; y: number; z: number }>;
+  chests: Array<{ rarity: ChestRarity; x: number; y: number; z: number; zoneLabel?: string }>;
 }
 
 export const WORLD_SPAWN_CREATURES: Record<string, WorldCreatureSpawns> = {
@@ -111,6 +112,43 @@ export const WORLD_SPAWN_CREATURES: Record<string, WorldCreatureSpawns> = {
       { type: 'quantum_sheep', x: -275, y: 2, z: -15 },
       { type: 'neon_pig', x: -260, y: 2, z: 25 },
     ],
+    chests: [
+      // Plaza Central & Torre de Victoria (Visibles al iniciar)
+      { rarity: 'comun', x: 7, y: 1, z: 14, zoneLabel: 'Plaza Central' },
+      { rarity: 'raro', x: -10, y: 1, z: 5, zoneLabel: 'Nexo de Victoria' },
+      { rarity: 'comun', x: 16, y: 1, z: -12, zoneLabel: 'Jardín Este' },
+      { rarity: 'legendario', x: 0, y: 13, z: 6, zoneLabel: 'Terraza de la Ciudadela' },
+      // Praderas y Bosques del Continente Central (Noroeste y Noreste)
+      { rarity: 'comun', x: -36, y: 1, z: -30, zoneLabel: 'Arboleda Noroeste' },
+      { rarity: 'comun', x: 36, y: 1, z: -30, zoneLabel: 'Arboleda Noreste' },
+      { rarity: 'raro', x: -64, y: 1, z: -52, zoneLabel: 'Pradera Cuántica Oeste' },
+      { rarity: 'raro', x: 64, y: 1, z: -52, zoneLabel: 'Pradera Cuántica Este' },
+      { rarity: 'raro', x: 0, y: 1, z: -86, zoneLabel: 'Sendero del Norte' },
+      { rarity: 'legendario', x: 0, y: 1, z: -132, zoneLabel: 'Mirador Boreal' },
+      // Puestos de Avanzada y Zona de Combate Sur / Este / Oeste
+      { rarity: 'raro', x: -48, y: 2, z: 53, zoneLabel: 'Fortín Suroeste' },
+      { rarity: 'raro', x: 48, y: 2, z: 53, zoneLabel: 'Fortín Sureste' },
+      { rarity: 'comun', x: -78, y: 1, z: 66, zoneLabel: ' Veta Volcánica Oeste' },
+      { rarity: 'comun', x: 78, y: 1, z: 66, zoneLabel: 'Veta Volcánica Este' },
+      { rarity: 'legendario', x: 0, y: 2, z: 93, zoneLabel: 'Altar de Batalla Sur' },
+      { rarity: 'raro', x: 98, y: 1, z: 8, zoneLabel: 'Frontera Este' },
+      { rarity: 'raro', x: -98, y: 1, z: 8, zoneLabel: 'Frontera Oeste' },
+      // Gran Bosque Cuántico del Norte (z ~ -270)
+      { rarity: 'comun', x: 0, y: 1, z: -236, zoneLabel: 'Entrada Bosque Norte' },
+      { rarity: 'raro', x: -28, y: 1, z: -272, zoneLabel: 'Claro Holográfico' },
+      { rarity: 'legendario', x: 26, y: 1, z: -292, zoneLabel: 'Santuario del Bosque' },
+      // Ruinas Titánicas del Cataclismo al Sur (z ~ 270)
+      { rarity: 'raro', x: -18, y: 2, z: 246, zoneLabel: 'Ruinas Exteriores' },
+      { rarity: 'raro', x: 20, y: 2, z: 268, zoneLabel: 'Cráter Glitch' },
+      { rarity: 'legendario', x: 0, y: 2, z: 292, zoneLabel: 'Núcleo del Cataclismo' },
+      // Bastión Imperial del Este (x ~ 270)
+      { rarity: 'raro', x: 242, y: 6, z: 14, zoneLabel: 'Muralla Imperial' },
+      { rarity: 'legendario', x: 276, y: 6, z: 0, zoneLabel: 'Trono del Bastión Este' },
+      // Valle del Mar de Cristales al Oeste (x ~ -270)
+      { rarity: 'comun', x: -238, y: 1, z: 16, zoneLabel: 'Costa de Datos' },
+      { rarity: 'raro', x: -296, y: 1, z: -26, zoneLabel: 'Agujas de Cristal' },
+      { rarity: 'legendario', x: -270, y: 1, z: 42, zoneLabel: 'Tesoro del Mar Oeste' },
+    ],
   },
   ciudad_neon: {
     enemies: [
@@ -134,6 +172,17 @@ export const WORLD_SPAWN_CREATURES: Record<string, WorldCreatureSpawns> = {
       { type: 'quantum_sheep', x: 0, y: 2, z: -50 },
       { type: 'neon_pig', x: 40, y: 2, z: 40 },
     ],
+    chests: [
+      { rarity: 'comun', x: 8, y: 1, z: 18, zoneLabel: 'Plaza Corporativa' },
+      { rarity: 'raro', x: -10, y: 1, z: 22, zoneLabel: 'Avenida Cian' },
+      { rarity: 'legendario', x: 0, y: 18, z: 4, zoneLabel: 'Azotea Corporativa' },
+      { rarity: 'comun', x: 48, y: 1, z: 24, zoneLabel: 'Distrito Este' },
+      { rarity: 'comun', x: -48, y: 1, z: -24, zoneLabel: 'Distrito Oeste' },
+      { rarity: 'raro', x: 85, y: 1, z: 85, zoneLabel: 'Torre Magenta Sur' },
+      { rarity: 'raro', x: -85, y: 1, z: -85, zoneLabel: 'Torre Magenta Norte' },
+      { rarity: 'legendario', x: 0, y: 1, z: -92, zoneLabel: 'Bóveda Central Norte' },
+      { rarity: 'legendario', x: 0, y: 1, z: 125, zoneLabel: 'Bóveda Sur' },
+    ],
   },
   oasis_flotante: {
     enemies: [
@@ -154,6 +203,16 @@ export const WORLD_SPAWN_CREATURES: Record<string, WorldCreatureSpawns> = {
       { type: 'cyber_dog', x: 0, y: 2, z: 65 },
       { type: 'cyber_dog', x: -30, y: 2, z: -55 },
     ],
+    chests: [
+      { rarity: 'comun', x: 8, y: 1, z: 48, zoneLabel: 'Orilla del Oasis' },
+      { rarity: 'raro', x: -12, y: 1, z: 42, zoneLabel: 'Muelle de Datos' },
+      { rarity: 'legendario', x: 0, y: 23, z: 6, zoneLabel: 'Santuario en las Nubes' },
+      { rarity: 'comun', x: 52, y: 1, z: 0, zoneLabel: 'Atolón Este' },
+      { rarity: 'comun', x: -52, y: 1, z: 0, zoneLabel: 'Atolón Oeste' },
+      { rarity: 'raro', x: 68, y: 1, z: -68, zoneLabel: 'Laguna Noreste' },
+      { rarity: 'raro', x: -68, y: 1, z: 68, zoneLabel: 'Laguna Suroeste' },
+      { rarity: 'legendario', x: 0, y: 1, z: -95, zoneLabel: 'Reliquia del Arrecife' },
+    ],
   },
   vacio_creativo: {
     enemies: [
@@ -164,6 +223,12 @@ export const WORLD_SPAWN_CREATURES: Record<string, WorldCreatureSpawns> = {
       { type: 'cyber_dog', x: 6, y: 2, z: 6 },
       { type: 'quantum_sheep', x: -8, y: 2, z: 8 },
       { type: 'neon_pig', x: 8, y: 2, z: -8 },
+    ],
+    chests: [
+      { rarity: 'comun', x: 6, y: 1, z: 10, zoneLabel: 'Taller Central' },
+      { rarity: 'raro', x: -10, y: 1, z: -10, zoneLabel: 'Esquina Noroeste' },
+      { rarity: 'raro', x: 25, y: 1, z: 25, zoneLabel: 'Plataforma Sur' },
+      { rarity: 'legendario', x: 0, y: 1, z: -32, zoneLabel: 'Cofre del Arquitecto' },
     ],
   },
 };

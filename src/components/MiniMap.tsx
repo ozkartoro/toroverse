@@ -23,7 +23,7 @@ import { sound } from '../audio/soundSystem';
 export interface MinimapPOI {
   id: string;
   name: string;
-  type: 'spawn' | 'citadel' | 'teleport' | 'jump' | 'beacon' | 'quest' | 'animal';
+  type: 'spawn' | 'citadel' | 'teleport' | 'jump' | 'beacon' | 'quest' | 'animal' | 'chest';
   x: number;
   z: number;
 }
@@ -98,10 +98,11 @@ export const MiniMap: React.FC<MiniMapProps> = ({
   // Radar sweep angle
   const sweepAngleRef = useRef(0);
 
-  // Filter nearby enemies count and POI count
+  // Filter nearby enemies count, chests count, and POI count
   const stats = useMemo(() => {
     let enemiesInRange = 0;
     let poisInRange = 0;
+    let chestsInRange = 0;
     enemies.forEach((en) => {
       if (Math.hypot(en.x - playerX, en.z - playerZ) <= currentRadius) {
         enemiesInRange++;
@@ -109,10 +110,14 @@ export const MiniMap: React.FC<MiniMapProps> = ({
     });
     pois.forEach((poi) => {
       if (Math.hypot(poi.x - playerX, poi.z - playerZ) <= currentRadius) {
-        poisInRange++;
+        if (poi.type === 'chest') {
+          chestsInRange++;
+        } else {
+          poisInRange++;
+        }
       }
     });
-    return { enemiesInRange, poisInRange };
+    return { enemiesInRange, poisInRange, chestsInRange };
   }, [enemies, pois, playerX, playerZ, currentRadius]);
 
   // Canvas Radar Render
@@ -293,6 +298,15 @@ export const MiniMap: React.FC<MiniMapProps> = ({
           ctx.beginPath();
           ctx.arc(x, y, 2.8, 0, Math.PI * 2);
           ctx.fill();
+        } else if (poi.type === 'chest') {
+          // Gleaming Golden Treasure Chest square marker
+          ctx.fillStyle = '#fbbf24';
+          ctx.strokeStyle = '#ffffff';
+          ctx.shadowColor = '#f59e0b';
+          ctx.shadowBlur = 6;
+          ctx.lineWidth = 1.2;
+          ctx.fillRect(x - 3.5, y - 3, 7, 6);
+          ctx.strokeRect(x - 3.5, y - 3, 7, 6);
         }
         ctx.restore();
       });
@@ -460,6 +474,11 @@ export const MiniMap: React.FC<MiniMapProps> = ({
           <span className="text-[10px] font-mono font-bold text-white">
             Mapa ({Math.round(playerX)}, {Math.round(playerZ)})
           </span>
+          {stats.chestsInRange > 0 && (
+            <span className="flex items-center gap-0.5 text-[10px] font-mono text-amber-300 font-bold">
+              🎁{stats.chestsInRange}
+            </span>
+          )}
           {stats.enemiesInRange > 0 && (
             <span className="flex items-center gap-0.5 text-[10px] font-mono text-rose-400 font-bold">
               ⚔️{stats.enemiesInRange}
@@ -540,6 +559,12 @@ export const MiniMap: React.FC<MiniMapProps> = ({
             </div>
 
             <div className="flex items-center gap-1">
+              {stats.chestsInRange > 0 && (
+                <span className="flex items-center gap-0.5 text-amber-300 font-bold" title="Cofres cercanos">
+                  <span>🎁</span>
+                  <span>{stats.chestsInRange}</span>
+                </span>
+              )}
               {stats.enemiesInRange > 0 && (
                 <span className="flex items-center gap-0.5 text-rose-400 font-bold animate-pulse">
                   <span>⚔️</span>
